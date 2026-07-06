@@ -41,4 +41,4 @@ CREATE TABLE IF NOT EXISTS pmp_gold (
     INDEX idx_id_pessoa     (id_pessoa),
     INDEX idx_status        (status_financeiro)
 
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

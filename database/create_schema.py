@@ -12,6 +12,15 @@ arquivos = [
     "gold/views/vw_bi_inadimplencia.sql",
     "database/schemas/gold/pmp_gold.sql",
     "database/schemas/gold/pmr_gold.sql",
+    "database/schemas/bronze/chamados_apoio_raw.sql",
+    "database/schemas/bronze/chamados_etiqueta.raw.sql",
+    "database/schemas/bronze/chamados_raw.sql",
+    "database/schemas/silver/chamados_apoio_bi.sql",
+    "database/schemas/silver/chamados_bi.sql",
+    "database/schemas/silver/chamados_departamento_bi.sql",
+    "database/schemas/silver/chamados_dim_etiqueta.sql",
+    "database/schemas/silver/chamados_etiqueta_bi.sql",
+    "database/schemas/gold/chamados_geral_gold.sql",
 ]
 
 for arquivo in arquivos:

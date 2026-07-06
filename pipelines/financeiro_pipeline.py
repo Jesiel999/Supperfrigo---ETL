@@ -1,12 +1,13 @@
 import logging
 from core.pipeline import Pipeline
 from core.step import Step
+from database.mysql_connection import connection_mysql
 
 from bronze.extract.sances.financeiro import extrair_financeiro
-from silver.transform.financeiro.financeiro import transformar_financeiro
-from gold.marts.inadimplencia import processar_inadimplencia
-from gold.marts.pmp import processar_pmp
-from gold.marts.pmr import processar_pmr
+from silver.transform.sances.financeiro.financeiro import transformar_financeiro
+from gold.marts.sances.inadimplencia import processar_inadimplencia
+from gold.marts.sances.pmp import processar_pmp
+from gold.marts.sances.pmr import processar_pmr
 
 from repositories.financeiro_repository import (
     upsert_financeiro_raw,
@@ -36,7 +37,7 @@ class StepExtrairFinanceiro(Step):
     ):
         super().__init__("ExtrairFinanceiro")
         self.tenant_id          = tenant_id
-        self.token              = token
+        self.token       = token
         self.data_baixa_inicial = data_baixa_inicial
         self.data_baixa_final   = data_baixa_final
         self.data_vencimento_inicial = data_vencimento_inicial
@@ -135,12 +136,36 @@ def executar_pipeline_financeiro(
     para um tenant específico.
 
     O token da API Sances é buscado na tabela tenant_config.
+    
     """
-    config = buscar_config_tenant(tenant_id)
+
+    def buscar_config_tenant(tenant_id: int):
+        conn = connection_mysql()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT
+                tenant_id,
+                token,
+                token,
+                ativo
+            FROM tenant_config
+            WHERE tenant_id = %s
+            AND ativo = 1
+        """, (tenant_id,))
+
+        config = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+
+        return config
+
+    config = buscar_config_tenant(1)
     if not config:
         raise ValueError(f"Tenant {tenant_id} não encontrado ou sem configuração.")
 
-    token = config.get("sances_token")
+    token = config.get("token")
     if not token:
         raise ValueError(f"Tenant {tenant_id} sem token Sances configurado.")
 

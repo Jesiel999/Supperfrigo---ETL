@@ -284,7 +284,7 @@ def buscar_bi_para_inadimplencia_gold() -> list[dict]:
             SELECT *
             FROM financeiro_bi
             WHERE tipo_titulo = 'RECEBER'
-              AND status_financeiro IN ('VENCIDO', 'EM_ABERTO', 'PAGO')
+              AND status_financeiro IN ('VENCIDO', 'EM ABERTO', 'PAGO')
             ORDER BY data_vencimento ASC
         """)
         rows = cursor.fetchall()

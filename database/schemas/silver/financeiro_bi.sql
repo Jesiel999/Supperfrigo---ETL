@@ -2,7 +2,8 @@ CREATE TABLE IF NOT EXISTS financeiro_bi (
 
     id                          BIGINT AUTO_INCREMENT PRIMARY KEY,
 
-    codigo_raw                  VARCHAR(50) NOT NULL UNIQUE,
+    tenant_id                   INTEGER NOT NULL,
+    codigo_raw                  INTEGER NOT NULL UNIQUE,
 
     -- Empresa
     id_empresa                  VARCHAR(50),
@@ -19,7 +20,7 @@ CREATE TABLE IF NOT EXISTS financeiro_bi (
     -- Situação
     codigo_situacao             VARCHAR(50),
     descricao_situacao          VARCHAR(255),
-    status_financeiro           VARCHAR(50),  -- PAGO | EM_ABERTO | VENCIDO | CANCELADO
+    status_financeiro           VARCHAR(50),  -- PAGO | EM ABERTO | VENCIDO | CANCELADO
 
     -- Forma cobrança / pagamento
     descricao_forma_cobranca    VARCHAR(255),
@@ -62,4 +63,4 @@ CREATE TABLE IF NOT EXISTS financeiro_bi (
     INDEX idx_data_vencimento   (data_vencimento),
     INDEX idx_data_baixa        (data_baixa)
 
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

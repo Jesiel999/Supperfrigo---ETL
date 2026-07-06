@@ -27,7 +27,8 @@ def buscar_config_tenant(tenant_id: int) -> dict | None:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS tenant_config (
                 tenant_id     INT          NOT NULL PRIMARY KEY,
-                sances_token  VARCHAR(500),
+                nome    VARCHAR(80)     NOT NULL,
+                token  VARCHAR(500),
                 ativo         TINYINT(1)   NOT NULL DEFAULT 1,
                 FOREIGN KEY (tenant_id) REFERENCES tenant(id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

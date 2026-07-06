@@ -88,7 +88,7 @@ def _buscar_usuarios(usuario_id: str, tenant_id: int) -> dict | None:
                 t.nome AS tenant_nome,
                 t.slug AS tenant_slug,
                 p.id   AS perfil_id,
-                p.nome AS perfil_nome,
+                p.nome AS role,
                 p.cor  AS perfil_cor
             FROM usuarios u
             JOIN usuario_tenant ut ON ut.usuario_id = u.id
@@ -142,7 +142,7 @@ def _buscar_usuarios(usuario_id: str, tenant_id: int) -> dict | None:
             "tenant_nome": base["tenant_nome"],
             "tenant_slug": base["tenant_slug"],
             "perfil_id":   base["perfil_id"],
-            "perfil_nome": base["perfil_nome"],
+            "role": base["role"],
             "perfil_cor":  base["perfil_cor"],
             "permissoes":  perms,
             "empresas": [

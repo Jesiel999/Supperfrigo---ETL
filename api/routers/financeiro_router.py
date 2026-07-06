@@ -12,7 +12,7 @@ def get_inadimplencia(
     id_pessoa:  Optional[str] = Query(None),
     data_inicio: Optional[str] = Query(None),
     data_fim:  Optional[str] = Query(None),
-    status:     Optional[str] = Query(None, description="VENCIDO | EM_ABERTO"),
+    status:     Optional[str] = Query(None, description="VENCIDO | EM ABERTO"),
     dias_atraso_min: Optional[int] = Query(None),
     # limit:      int = Query(100, le=1000),
     # offset:     int = Query(0),

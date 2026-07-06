@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS financeiro_raw (
 
     tenant_id                       INTEGER NOT NULL,
 
-    codigo                          VARCHAR(50)  NOT NULL UNIQUE,
+    codigo                          INTEGER NOT NULL UNIQUE,
     tipo_titulo                     VARCHAR(20),
 
     codigo_empresa                  VARCHAR(50),
@@ -128,4 +128,4 @@ CREATE TABLE IF NOT EXISTS financeiro_raw (
     INDEX idx_data_baixa        (data_baixa),
     INDEX idx_data_alteracao    (data_alteracao)
 
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

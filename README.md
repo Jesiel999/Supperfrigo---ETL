@@ -20,7 +20,7 @@ ETL/
 ├── bronze/extract/sances/financeiro.py   ← APENAS extração da API
 ├── silver/transform/financeiro/financeiro.py ← Transformação + cálculo status
 ├── gold/
-│   ├── marts/inadimplencia.py      ← Carga na gold
+│   ├── marts/sances.inadimplencia.py      ← Carga na gold
 │   ├── views/vw_bi_inadimplencia.sql
 │   └── indicators/kpi_inadimplencia.py
 ├── pipelines/financeiro_pipeline.py ← Orquestra Bronze→Silver→Gold
@@ -73,7 +73,7 @@ uvicorn app:app --reload --port 8000
 |-----------|------|-----------|
 | `id_empresa` | string | Filtrar por empresa |
 | `id_pessoa` | string | Filtrar por pessoa |
-| `status` | string | `VENCIDO` \| `EM_ABERTO` |
+| `status` | string | `VENCIDO` \| `EM ABERTO` |
 | `dias_atraso_min` | int | Mínimo de dias em atraso |
 | `limit` / `offset` | int | Paginação |
 
@@ -88,7 +88,7 @@ uvicorn app:app --reload --port 8000
 
 ---
 
-## Fluxo de dados
+## Fluxo de dados SANCES
 
 ```
 API Sances
@@ -106,6 +106,24 @@ GOLD — inadimplencia_gold + vw_bi_inadimplencia
 FastAPI → Angular Dashboard
 ```
 
+## Fluxo de dados SULTS
+
+```
+API Sults
+   │
+   ▼
+BRONZE — chamados_raw
+   │   (extração pura, sem transformação)
+   ▼
+SILVER — chamados_bi
+   │   (status_financeiro, dias_atraso calculados)
+   ▼
+GOLD — chamados_geral_gold + vw_bi_geral
+   │
+   ▼
+FastAPI → Angular Dashboard
+```
+
 ---
 
 ## Status financeiro calculado (Silver)
@@ -115,4 +133,4 @@ FastAPI → Angular Dashboard
 | `data_baixa` preenchida | `PAGO` |
 | Situação contém "CANCELADO" | `CANCELADO` |
 | `data_vencimento` < hoje e sem baixa | `VENCIDO` |
-| Demais casos | `EM_ABERTO` |
+| Demais casos | `EM ABERTO` |

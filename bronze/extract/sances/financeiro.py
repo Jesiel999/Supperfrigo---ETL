@@ -7,7 +7,7 @@ from requests.exceptions import ConnectionError, Timeout, RequestException
 from datetime import datetime
 
 from config.settings import (
-    TOKEN,
+    SANCES_TOKEN,
     URL_FINANCEIRO,
     REQUEST_TIMEOUT,
     RATE_LIMIT_SLEEP,
@@ -21,7 +21,7 @@ class RateLimitAtingido(Exception):
     
 logger = get_layer_logger("bronze", "financeiro")
 
-HEADERS = {"Authorization": f"Bearer {TOKEN}"}
+HEADERS = {"Authorization": f"Bearer {SANCES_TOKEN}"}
 
 # ==========================================
 # CAMPOS PERMITIDOS
