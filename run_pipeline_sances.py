@@ -8,10 +8,10 @@ def executar_sances():
 
     return executar_pipeline_financeiro(
         tenant_id=1,
-        data_baixa_inicial="2026-07-01",
-        data_baixa_final="2026-07-30",
-        data_vencimento_inicial="",
-        data_vencimento_final="",
+        data_baixa_inicial="",
+        data_baixa_final="",
+        data_vencimento_inicial="2026-07-01",
+        data_vencimento_final="2026-07-30",
         # data_vencimento_final=datetime.now().strftime("%Y-%m-%d"),
     )
 

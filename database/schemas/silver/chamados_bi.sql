@@ -51,5 +51,5 @@ CREATE TABLE IF NOT EXISTS chamados_bi (
     atualizado_em           DATETIME DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-    UNIQUE KEY uk_chamado (codigo)
+    UNIQUE KEY uk_chamado (codigo_raw)
 );

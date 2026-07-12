@@ -13,7 +13,7 @@ arquivos = [
     "database/schemas/gold/pmp_gold.sql",
     "database/schemas/gold/pmr_gold.sql",
     "database/schemas/bronze/chamados_apoio_raw.sql",
-    "database/schemas/bronze/chamados_etiqueta.raw.sql",
+    "database/schemas/bronze/chamados_etiqueta_raw.sql",
     "database/schemas/bronze/chamados_raw.sql",
     "database/schemas/silver/chamados_apoio_bi.sql",
     "database/schemas/silver/chamados_bi.sql",

@@ -23,6 +23,7 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
     tenant_id é obrigatório — garante isolamento multi-tenant.
     """
     resultado: list[dict] = []
+    hoje = date.today()
 
     for raw in registros_raw:
         try:
@@ -31,10 +32,22 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
             data_cancelamento = _to_date(raw.get("data_cancelamento"))
             data_emissao      = _to_date(raw.get("data_emissao"))
             data_competencia  = _to_date(raw.get("data_competencia"))
+            
+            descricao_situacao = str(raw.get("descricao_situacao") or "").strip().upper()
 
+            # não subir CANCELADO e UNIDO
+            if descricao_situacao in {"CANCELADO", "UNIDO", "RENEGOCIADO "}:
+                continue
             # dias_atraso calculado na view, mas salvamos na silver também
             
-            
+            # status_financeiro
+            if data_baixa:
+                status_financeiro = "PAGO"
+            elif data_vencimento and data_vencimento < hoje:
+                status_financeiro = "VENCIDO"
+            else:
+                status_financeiro = "EM ABERTO"
+
             # dias_atraso
             dias_atraso: int | None = None
 
@@ -87,6 +100,7 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
                 # ── Situação ─────────────────────────────────
                 "codigo_situacao":             raw.get("codigo_situacao"),
                 "descricao_situacao":          raw.get("descricao_situacao"),
+                "status_financeiro":           status_financeiro,
 
                 # ── Cobrança / Pagamento ─────────────────────
                 "descricao_forma_cobranca":    raw.get("descricao_forma_cobranca"),
