@@ -4,6 +4,8 @@ from auth.router import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from scheduler import iniciar_scheduler, parar_scheduler
+from datetime import datetime
+import time
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,6 +39,14 @@ app.include_router(usuarios_router.router,  prefix="/usuarios",  tags=["Usuarios
 app.include_router(permissoes_router.router, prefix="/permissoes", tags=["Permissoes"])
 app.include_router(empresas_router.router, prefix="/empresas", tags=["Empresas"])
 
+@app.get("/debug/time")
+def debug_time():
+    return {
+        "datetime_now": str(datetime.now()),
+        "datetime_utc": str(datetime.utcnow()),
+        "timezone": time.tzname,
+        "offset": time.timezone,
+    }
 @app.get("/")
 def root():
     return {"status": "ETL API online"}
