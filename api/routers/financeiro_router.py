@@ -137,11 +137,11 @@ def get_pmp(
             params.append(id_pessoa)
 
         if data_inicio:
-            filtros.append("data_vencimento >= %s")
+            filtros.append("data_baixa >= %s")
             params.append(data_inicio)
 
         if data_fim:
-            filtros.append("data_vencimento <= %s")
+            filtros.append("data_baixa <= %s")
             params.append(data_fim)
 
         if dias_atraso_min is not None:
@@ -201,11 +201,11 @@ def get_pmr(   # <-- renomeado (estava duplicado como get_pmp, sobrescrevia o no
             params.append(id_pessoa)
 
         if data_inicio:
-            filtros.append("data_vencimento >= %s")
+            filtros.append("data_baixa >= %s")
             params.append(data_inicio)
 
         if data_fim:
-            filtros.append("data_vencimento <= %s")
+            filtros.append("data_baixa <= %s")
             params.append(data_fim)
 
         if dias_atraso_min is not None:

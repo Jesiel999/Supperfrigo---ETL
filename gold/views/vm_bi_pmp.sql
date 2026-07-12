@@ -24,7 +24,11 @@ SELECT
     pg.dias_pagamento                AS dias_pagamento,
 
     pg.status_financeiro             AS status_financeiro,
-    pg.descricao_situacao            AS descricao_situacao
+    pg.descricao_situacao            AS descricao_situacao,
+    (
+        SELECT MAX(fb.atualizado_em)
+        FROM inadimplencia_gold fb
+    ) AS ultima_atualizacao
 
 FROM pmp_gold AS pg
 
