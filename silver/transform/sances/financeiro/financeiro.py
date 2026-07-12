@@ -64,10 +64,10 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
 
             if (
                 raw.get("tipo_titulo") == "PAGAR"
-                and data_vencimento
+                and data_emissao
                 and data_baixa
             ):
-                dias_pagamento = (data_baixa - data_vencimento).days
+                dias_pagamento = (data_baixa - data_emissao).days
 
 
             # dias_recebimento
