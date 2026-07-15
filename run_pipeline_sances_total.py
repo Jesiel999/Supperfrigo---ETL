@@ -5,7 +5,7 @@ setup_logging()
 
 # a (Em aberto), t (Baixado), p (Baixado parcial), c (Cancelado),
 # r (Renegociado), u (Unido), x (Trânsito)
-SITUACOES = ["a", "t", "p", "c", "r", "u", "x"]
+SITUACOES = ["t", "p", "c", "r", "u", "x", "a"]
 
 def executar_sances_total():
     """

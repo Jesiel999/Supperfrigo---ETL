@@ -93,10 +93,10 @@ def _filtrar_item(item: dict) -> dict:
     return {k: v for k, v in item.items() if k in CAMPOS_PERMITIDOS}
 
 
-def _salvar_offset(offset: int):
+def _salvar_offset(offset: int, offset_file: str):
     """Persiste o offset atual em disco."""
     os.makedirs("logs/bronze", exist_ok=True)
-    with open(OFFSET_FILE, "w") as f:
+    with open(offset_file, "w") as f:
         f.write(str(offset))
 
 
@@ -121,8 +121,8 @@ def _ler_offset(offset_inicial: int | None) -> int:
         logger.info(f"Offset forçado por parâmetro: {offset_inicial}")
         return offset_inicial
 
-    if os.path.exists(OFFSET_FILE):
-        with open(OFFSET_FILE) as f:
+    if os.path.exists(offset_file):
+        with open(offset_file) as f:
             valor = f.read().strip()
         if valor.isdigit():
             offset = int(valor)
@@ -137,6 +137,7 @@ def _fetch_page(
     limit: int,
     offset: int,
     extra_params: dict | None = None,
+    offset_file: str | None = None,
 ) -> list[dict] | None:
     """
     Busca uma página da API.

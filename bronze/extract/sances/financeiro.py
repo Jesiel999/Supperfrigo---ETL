@@ -138,7 +138,7 @@ def _salvar_offset(offset: int, offset_file: str):
         f.write(str(offset))
 
 
-def _resetar_offset(offset_file: int):
+def _resetar_offset(offset_file: str):
     """
     Reseta o offset para 1 após conclusão bem-sucedida.
     Na próxima execução a varredura começa do início.
@@ -174,7 +174,8 @@ def _ler_offset(offset_inicial: int | None, offset_file: str | None) -> int:
 def _fetch_page(
     limit: int,
     offset: int,
-    extra_params: dict | None = None
+    extra_params: dict | None = None,
+    offset_file: str | None = None,
 ) -> list[dict] | None:
     """
     Busca uma página da API.
