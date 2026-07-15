@@ -19,7 +19,7 @@ class RateLimitAtingido(Exception):
     """Exceção utilizada para encerrar a extração quando atingir rate limit."""
     pass
     
-logger = get_layer_logger("bronze", "financeiro")
+logger = get_layer_logger("bronze", "pessoa_sances")
 
 HEADERS = {"Authorization": f"Bearer {SANCES_TOKEN}"}
 
@@ -27,48 +27,10 @@ HEADERS = {"Authorization": f"Bearer {SANCES_TOKEN}"}
 # CAMPOS PERMITIDOS
 # ==========================================
 CAMPOS_PERMITIDOS = [
-    "codigo", "tipo_titulo",
-    "codigo_empresa", "nome_empresa",
-    "codigo_situacao", "descricao_situacao",
-    "codigo_pessoa", "nome_pessoa",
-    "codigo_cliente_fornecedor", "nome_cliente_fornecedor",
-    "titulo_previsao", "criado_manualmente",
-    "origem", "codigo_origem",
-    "numero_documento", "ordem",
-    "codigo_forma_cobranca", "descricao_forma_cobranca",
-    "codigo_vendedor", "descricao_vendedor",
-    "historico",
-    "codigo_grupo", "descricao_grupo",
-    "codigo_departamento", "descricao_departamento",
-    "observacao", "observacoes_boleto",
-    "codigo_barras",
-    "codigo_forma_pagamento", "descricao_forma_pagamento",
-    "codigo_categoria_financeira", "descricao_categoria_financeira",
-    "codigo_convenio", "descricao_convenio",
-    "codigo_conveniado", "descricao_conveniado",
-    "codigo_aprovador", "nome_aprovador",
-    "nosso_numero", "numero_remessa",
-    "titulo_origem", "titulo_gerado",
-    "codigo_conta_patrimonial", "numero_conta_patrimonial", "descricao_conta_patrimonial",
-    "codigo_conta_resultado", "numero_conta_resultado", "descricao_conta_resultado",
-    "codigo_centro_custo", "descricao_centro_custo",
-    "data_emissao", "data_competencia", "data_vencimento",
-    "codigo_usuario_insercao", "nome_usuario_insercao", "data_insercao",
-    "codigo_usuario_alteracao", "nome_usuario_alteracao", "data_alteracao",
-    "codigo_usuario_cancelamento", "nome_usuario_cancelamento", "data_cancelamento",
-    "motivo_cancelamento",
-    "codigo_usuario_baixa", "nome_usuario_baixa", "data_baixa",
-    "codigo_usuario_aprovacao", "nome_usuario_aprovacao", "data_aprovacao",
-    "valor_nominal", "valor_multa",
-    "percentual_multa", "percentual_juros",
-    "taxa_boleto", "juros_crediario_proprio",
-    "acrescimo", "valor_total",
+    
 ]
 
 CAMPOS_DATA = [
-    "data_emissao", "data_competencia", "data_vencimento",
-    "data_insercao", "data_alteracao",
-    "data_cancelamento", "data_baixa", "data_aprovacao",
 ]
 
 # ==========================================
@@ -78,7 +40,7 @@ CAMPOS_DATA = [
 # Mantido no valor atual ao falhar, para
 # retomar da página onde parou.
 # ==========================================
-OFFSET_FILE = "logs/bronze/financeiro_offset.txt"
+OFFSET_FILE = "logs/bronze/pessoa_codigo.txt"
 
 
 # ==========================================
@@ -131,23 +93,23 @@ def _filtrar_item(item: dict) -> dict:
     return {k: v for k, v in item.items() if k in CAMPOS_PERMITIDOS}
 
 
-def _salvar_offset(offset: int, offset_file: str):
+def _salvar_offset(offset: int):
     """Persiste o offset atual em disco."""
     os.makedirs("logs/bronze", exist_ok=True)
-    with open(offset_file, "w") as f:
+    with open(OFFSET_FILE, "w") as f:
         f.write(str(offset))
 
 
-def _resetar_offset(offset_file: int):
+def _resetar_offset():
     """
     Reseta o offset para 1 após conclusão bem-sucedida.
     Na próxima execução a varredura começa do início.
     """
-    _salvar_offset(1, offset_file)
-    logger.info(f"Offset resetado para 1. Próxima execução varre do início: {offset_file}.")
+    _salvar_offset(1)
+    logger.info("Offset resetado para 1. Próxima execução varre do início.")
 
 
-def _ler_offset(offset_inicial: int | None, offset_file: str | None) -> int:
+def _ler_offset(offset_inicial: int | None) -> int:
     """
     Retorna o offset de onde a extração deve começar.
     Prioridade:
@@ -159,22 +121,22 @@ def _ler_offset(offset_inicial: int | None, offset_file: str | None) -> int:
         logger.info(f"Offset forçado por parâmetro: {offset_inicial}")
         return offset_inicial
 
-    if os.path.exists(offset_file):
-        with open(offset_file) as f:
+    if os.path.exists(OFFSET_FILE):
+        with open(OFFSET_FILE) as f:
             valor = f.read().strip()
         if valor.isdigit():
             offset = int(valor)
-            logger.info(f"Offset recuperado do disco ({offset_file}): {offset}")
+            logger.info(f"Offset recuperado do disco: {offset}")
             return offset
 
-    logger.info("Nenhum offset salvo em {offset_file}. Iniciando do offset 1.")
+    logger.info("Nenhum offset salvo. Iniciando do offset 1.")
     return 1
 
 
 def _fetch_page(
     limit: int,
     offset: int,
-    extra_params: dict | None = None
+    extra_params: dict | None = None,
 ) -> list[dict] | None:
     """
     Busca uma página da API.
@@ -208,7 +170,7 @@ def _fetch_page(
                     f"Encerrando Bronze e salvando offset para continuação futura."
                 )
 
-                _salvar_offset(offset, offset_file)
+                _salvar_offset(offset)
 
                 raise RateLimitAtingido(
                     f"Rate limit atingido na página {offset}"
@@ -224,7 +186,7 @@ def _fetch_page(
                 f"Erro HTTP {response.status_code} na página {offset}: "
                 f"{response.text[:300]}"
             )
-            _salvar_offset(offset, offset_file)  # guarda para retomar depois
+            _salvar_offset(offset)  # guarda para retomar depois
             return None
 
         except Timeout:
@@ -244,7 +206,7 @@ def _fetch_page(
         return dados
     except Exception as e:
         logger.error(f"Erro ao parsear JSON da página {offset}: {e}")
-        _salvar_offset(offset, offset_file)
+        _salvar_offset(offset)
         return None
 
 
@@ -260,46 +222,8 @@ def extrair_financeiro(
     data_baixa_final: str | None = None,
     data_insercao_inicial: str | None = None,
     data_insercao_final: str | None = None,
-    codigo_situacao: str | None = None,
-    offset_file: str = OFFSET_FILE,
 ) -> list[dict]:
-    """
-    Extrai todos os registros financeiros da API Sances paginando
-    automaticamente até não haver mais dados.
-
-    Comportamento do offset:
-      - Se a extração terminar com SUCESSO (API retornou vazio = fim dos dados),
-        o offset é RESETADO para 1. A próxima execução varre tudo do início.
-      - Se a extração for INTERROMPIDA por erro (HTTP, conexão, etc.),
-        o offset é MANTIDO na página onde falhou. A próxima execução
-        RETOMA de onde parou.
-
-    Args:
-        limit:               Registros por página. Máximo 100 (limite da API).
-        offset_inicial:      Força início em uma página específica.
-                             Se None, usa o offset salvo ou começa do 1.
-        data_baixa_inicial:  Filtra registros com data_baixa >= este valor.
-                             Formato: "YYYY-MM-DD". Ex: "2024-01-01"
-        data_baixa_final:    Filtra registros com data_baixa <= este valor.
-                             Formato: "YYYY-MM-DD". Ex: "2024-12-31"
-                             Se None, traz até a data de hoje.
-        data_insercao_inicial:  Filtra registros com data_vencimento >= este valor.
-                             Formato: "YYYY-MM-DD". Ex: "2024-01-01"
-        data_insercao_final:    Filtra registros com data_vencimento <= este valor.
-                             Formato: "YYYY-MM-DD". Ex: "2024-12-31"
-                             Se None, traz até a data de hoje.
-        extra_params:        Qualquer outro parâmetro aceito pela API Sances.
-                             Ex: {"tipo_titulo": "RECEBER", "codigo_empresa": "1"}
-        codigo_situacao: filtra pela situação do título.
-                          Valores: a, t, p, c, r, u, x
-        offset_file:      caminho do arquivo de controle de paginação.
-                          Use um arquivo diferente por job (diário/total/situação)
-                          para evitar que um job sobrescreva o progresso do outro.
-
-    Returns:
-        Lista de dicts com os campos de CAMPOS_PERMITIDOS,
-        com datas já convertidas para "YYYY-MM-DD HH:MM:SS".
-    """
+   
     os.makedirs("logs/bronze", exist_ok=True)
 
     # ==========================================
@@ -322,15 +246,11 @@ def extrair_financeiro(
     if data_insercao_final:
         params_extra["data_insercao_final"] = data_insercao_final
         logger.info(f"Filtro data_insercao_final: {data_insercao_final}")
-    
-    if codigo_situacao:
-        params_extra["codigo_situacao"] = codigo_situacao
-        logger.info(f"Filtro de situcao: {codigo_situacao}")
 
     # ==========================================
     # DETERMINA OFFSET DE INÍCIO
     # ==========================================
-    offset = _ler_offset(offset_inicial, offset_file)
+    offset = _ler_offset(offset_inicial)
 
     todos_registros: list[dict] = []
     extracao_ok = False  # flag: True apenas se terminou naturalmente (sem erro)
@@ -348,10 +268,9 @@ def extrair_financeiro(
 
         try:
             dados = _fetch_page(
-                limit=limit,
-                offset=offset,
-                extra_params=params_extra if params_extra else None,
-                offset_file=offset_file,
+                limit,
+                offset,
+                params_extra if params_extra else None
             )
 
         except RateLimitAtingido:
@@ -370,13 +289,13 @@ def extrair_financeiro(
         # ==========================================
         if not dados:
             logger.info(
-                f"Página {offset} veio vazia (situacao={codigo_situacao}) — fim dos registros. "
+                f"Página {offset} veio vazia — fim dos registros. "
                 f"Total extraído: {len(todos_registros)} registros."
             )
             extracao_ok = True
             break
 
-        logger.info(f"Página {offset} (situacao={codigo_situacao}): {len(dados)} registros recebidos.")
+        logger.info(f"Página {offset}: {len(dados)} registros recebidos.")
 
         # ==========================================
         # PROCESSA REGISTROS DA PÁGINA
@@ -391,7 +310,7 @@ def extrair_financeiro(
         # Garante que, se o processo morrer durante
         # o processamento, não perde a página atual.
         # ==========================================
-        _salvar_offset(offset, offset_file)
+        _salvar_offset(offset)
         time.sleep(SLEEP_REQUEST)
         offset += 1
 
@@ -399,15 +318,12 @@ def extrair_financeiro(
     # PÓS-LOOP: RESETA OU MANTÉM OFFSET
     # ==========================================
     if extracao_ok:
-        _resetar_offset(offset_file)
+        _resetar_offset()
     else:
         logger.warning(
             "Extração encerrada com falha. "
             "Execute novamente para retomar do ponto de parada."
         )
 
-    logger.info(
-        f"Extração finalizada | situacao={codigo_situacao} | "
-        f"registros={len(todos_registros)} | sucesso={extracao_ok}"
-    )
+    logger.info(f"Extração finalizada | registros={len(todos_registros)} | sucesso={extracao_ok}")
     return todos_registros

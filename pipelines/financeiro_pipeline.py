@@ -32,24 +32,30 @@ class StepExtrairFinanceiro(Step):
         token:              str,
         data_baixa_inicial: str | None = None,
         data_baixa_final:   str | None = None,
-        data_vencimento_inicial: str | None = None,
-        data_vencimento_final: str | None = None,
+        data_insercao_inicial: str | None = None,
+        data_insercao_final: str | None = None,
+        codigo_situacao: str | None = None,
+        offset_file: str | None = None
     ):
         super().__init__("ExtrairFinanceiro")
         self.tenant_id          = tenant_id
         self.token       = token
         self.data_baixa_inicial = data_baixa_inicial
         self.data_baixa_final   = data_baixa_final
-        self.data_vencimento_inicial = data_vencimento_inicial
-        self.data_vencimento_final = data_vencimento_final
+        self.data_insercao_inicial = data_insercao_inicial
+        self.data_insercao_final = data_insercao_final
+        self.codigo_situacao = codigo_situacao
+        self.offset_file = offset_file or f"logs/bronze/financeiro_offset_{self.tenant_id}.txt"
 
     def execute(self, context: dict) -> dict:
         registros = extrair_financeiro(
             limit=100,
             data_baixa_inicial=self.data_baixa_inicial,
             data_baixa_final=self.data_baixa_final,
-            data_vencimento_inicial=self.data_vencimento_inicial,
-            data_vencimento_final=self.data_vencimento_final,
+            data_insercao_inicial=self.data_insercao_inicial,
+            data_insercao_final=self.data_insercao_final,
+            codigo_situacao=self.codigo_situacao,
+            offset_file=self.offset_file,
         )
 
         # Injeta tenant_id em cada registro antes de gravar
@@ -60,7 +66,7 @@ class StepExtrairFinanceiro(Step):
         context["bronze_resultado"] = resultado
         context["bronze_total"]     = len(registros)
         context["tenant_id"]        = self.tenant_id
-        logger.info(f"[BRONZE] tenant={self.tenant_id} {resultado}")
+        logger.info(f"[BRONZE] tenant={self.tenant_id} situacao={self.codigo_situacao} {resultado}")
         return context
 
 
@@ -128,8 +134,10 @@ def executar_pipeline_financeiro(
     tenant_id:          int,
     data_baixa_inicial: str | None = None,
     data_baixa_final:   str | None = None,
-    data_vencimento_inicial: str | None = None,
-    data_vencimento_final: str | None = None,
+    data_insercao_inicial: str | None = None,
+    data_insercao_final: str | None = None,
+    codigo_situacao: str | None = None,
+    offset_file: str | None = None,
 ) -> dict:
     """
     Executa o pipeline completo Bronze → Silver → Gold
@@ -176,8 +184,10 @@ def executar_pipeline_financeiro(
             token=token,
             data_baixa_inicial=data_baixa_inicial,
             data_baixa_final=data_baixa_final,
-            data_vencimento_inicial=data_vencimento_inicial,
-            data_vencimento_final=data_vencimento_final,
+            data_insercao_inicial=data_insercao_inicial,
+            data_insercao_final=data_insercao_final,
+            codigo_situacao=codigo_situacao,
+            offset_file=offset_file,
         ))
         .add_step(StepTransformarFinanceiro())
         .add_step(StepProcessarInadimplencia())
@@ -191,8 +201,8 @@ def executar_pipeline_financeiro(
 def executar_todos_tenants(
     data_baixa_inicial: str | None = None,
     data_baixa_final:   str | None = None,
-    data_vencimento_inicial: str | None = None,
-    data_vencimento_final: str | None = None,
+    data_insercao_inicial: str | None = None,
+    data_insercao_final: str | None = None,
 ) -> list[dict]:
     """
     Executa o pipeline para TODOS os tenants ativos.
@@ -210,8 +220,8 @@ def executar_todos_tenants(
                 tenant_id=t["id"],
                 data_baixa_inicial=data_baixa_inicial,
                 data_baixa_final=data_baixa_final,
-                data_vencimento_inicial=data_vencimento_inicial,
-                data_vencimento_final=data_vencimento_final,
+                data_insercao_inicial=data_insercao_inicial,
+                data_insercao_final=data_insercao_final,
             )
             resultados.append({"tenant_id": t["id"], "status": "ok", **res})
         except Exception as e:

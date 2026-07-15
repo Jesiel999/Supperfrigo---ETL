@@ -122,12 +122,17 @@ def buscar_raw_para_transform(somente_nao_transformados: bool = True) -> list[di
             # LEFT JOIN: pega tudo do raw que não tem par no bi,
             # ou cujo raw.atualizado_em é mais recente que o bi.atualizado_em
             sql = """
-                SELECT * FROM financeiro_raw
-                ORDER BY codigo ASC 
+                SELECT r.*
+                    FROM financeiro_raw r
+                    LEFT JOIN financeiro_bi b
+                        ON b.codigo_raw = r.codigo
+                    WHERE b.codigo_raw IS NULL
+
+                    OR r.data_alteracao > b.atualizado_em
             """
             logger.info("Buscando registros raw pendentes de transformação (LEFT JOIN)...")
         else:
-            sql = "SELECT * FROM financeiro_raw ORDER BY id ASC"
+            sql = "SELECT * FROM financeiro_raw ORDER BY codigo ASC"
             logger.info("Buscando TODOS os registros raw (reprocessamento forçado)...")
 
         cursor.execute(sql)
