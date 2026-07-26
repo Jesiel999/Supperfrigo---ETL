@@ -5,16 +5,11 @@ from database.mysql_connection import connection_mysql
 
 from bronze.extract.sances.financeiro import extrair_financeiro
 from silver.transform.sances.financeiro.financeiro import transformar_financeiro
-from gold.marts.sances.inadimplencia import processar_inadimplencia
-from gold.marts.sances.pmp import processar_pmp
-from gold.marts.sances.pmr import processar_pmr
 
 from repositories.financeiro_repository import (
     upsert_financeiro_raw,
     buscar_raw_para_transform,
-    upsert_financeiro_bi,
-    upsert_pmp_gold,
-    upsert_pmr_gold
+    upsert_financeiro_bi
 )
 from repositories.tenant_repository import buscar_config_tenant
 
@@ -30,8 +25,8 @@ class StepExtrairFinanceiro(Step):
         self,
         tenant_id:          int,
         token:              str,
-        data_baixa_inicial: str | None = None,
-        data_baixa_final:   str | None = None,
+        data_vencimento_inicial: str | None = None,
+        data_vencimento_final:   str | None = None,
         data_insercao_inicial: str | None = None,
         data_insercao_final: str | None = None,
         codigo_situacao: str | None = None,
@@ -40,8 +35,8 @@ class StepExtrairFinanceiro(Step):
         super().__init__("ExtrairFinanceiro")
         self.tenant_id          = tenant_id
         self.token       = token
-        self.data_baixa_inicial = data_baixa_inicial
-        self.data_baixa_final   = data_baixa_final
+        self.data_vencimento_inicial = data_vencimento_inicial
+        self.data_vencimento_final   = data_vencimento_final
         self.data_insercao_inicial = data_insercao_inicial
         self.data_insercao_final = data_insercao_final
         self.codigo_situacao = codigo_situacao
@@ -50,8 +45,8 @@ class StepExtrairFinanceiro(Step):
     def execute(self, context: dict) -> dict:
         registros = extrair_financeiro(
             limit=100,
-            data_baixa_inicial=self.data_baixa_inicial,
-            data_baixa_final=self.data_baixa_final,
+            data_vencimento_inicial=self.data_vencimento_inicial,
+            data_vencimento_final=self.data_vencimento_final,
             data_insercao_inicial=self.data_insercao_inicial,
             data_insercao_final=self.data_insercao_final,
             codigo_situacao=self.codigo_situacao,
@@ -85,10 +80,6 @@ class StepTransformarFinanceiro(Step):
         context["silver_total"]     = len(registros_bi)
         logger.info(f"[SILVER] tenant={tenant_id} {resultado}")
         return context
-
-
-class StepProcessarInadimplencia(Step):
-    """Gold: processa inadimplência para o tenant."""
 
     def __init__(self):
         super().__init__("ProcessarInadimplencia")
@@ -132,8 +123,8 @@ class StepProcessarPmr(Step):
 
 def executar_pipeline_financeiro(
     tenant_id:          int,
-    data_baixa_inicial: str | None = None,
-    data_baixa_final:   str | None = None,
+    data_vencimento_inicial: str | None = None,
+    data_vencimento_final:   str | None = None,
     data_insercao_inicial: str | None = None,
     data_insercao_final: str | None = None,
     codigo_situacao: str | None = None,
@@ -182,8 +173,8 @@ def executar_pipeline_financeiro(
         .add_step(StepExtrairFinanceiro(
             tenant_id=tenant_id,
             token=token,
-            data_baixa_inicial=data_baixa_inicial,
-            data_baixa_final=data_baixa_final,
+            data_vencimento_inicial=data_vencimento_inicial,
+            data_vencimento_final=data_vencimento_final,
             data_insercao_inicial=data_insercao_inicial,
             data_insercao_final=data_insercao_final,
             codigo_situacao=codigo_situacao,
@@ -199,8 +190,8 @@ def executar_pipeline_financeiro(
 
 
 def executar_todos_tenants(
-    data_baixa_inicial: str | None = None,
-    data_baixa_final:   str | None = None,
+    data_vencimento_inicial: str | None = None,
+    data_vencimento_final:   str | None = None,
     data_insercao_inicial: str | None = None,
     data_insercao_final: str | None = None,
 ) -> list[dict]:
@@ -218,8 +209,8 @@ def executar_todos_tenants(
         try:
             res = executar_pipeline_financeiro(
                 tenant_id=t["id"],
-                data_baixa_inicial=data_baixa_inicial,
-                data_baixa_final=data_baixa_final,
+                data_vencimento_inicial=data_vencimento_inicial,
+                data_vencimento_final=data_vencimento_final,
                 data_insercao_inicial=data_insercao_inicial,
                 data_insercao_final=data_insercao_final,
             )

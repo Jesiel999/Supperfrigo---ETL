@@ -36,7 +36,7 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
             descricao_situacao = str(raw.get("descricao_situacao") or "").strip().upper()
 
             # não subir CANCELADO e UNIDO
-            if descricao_situacao in {"CANCELADO", "UNIDO", "RENEGOCIADO "}:
+            if descricao_situacao in {"CANCELADO", "UNIDO", "RENEGOCIADO"}:
                 continue
             # dias_atraso calculado na view, mas salvamos na silver também
             
@@ -131,6 +131,9 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
                 "dias_atraso":                 dias_atraso,
                 "dias_pagamento":              dias_pagamento,
                 "dias_recebimento":            dias_recebimento,
+
+                # ── Data ──────────────────────────────────────
+                "criado_em":                   raw.get("data_alteracao"),
             }
 
             resultado.append(bi)

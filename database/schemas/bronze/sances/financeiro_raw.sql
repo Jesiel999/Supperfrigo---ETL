@@ -117,9 +117,6 @@ CREATE TABLE IF NOT EXISTS financeiro_raw (
     acrescimo                       DECIMAL(15, 2),
     valor_total                     DECIMAL(15, 2),
 
-    criado_em                       DATETIME DEFAULT CURRENT_TIMESTAMP,
-    atualizado_em                   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     INDEX idx_codigo_empresa    (codigo_empresa),
     INDEX idx_codigo_pessoa     (codigo_pessoa),
     INDEX idx_tipo_titulo       (tipo_titulo),

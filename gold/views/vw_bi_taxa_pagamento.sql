@@ -1,8 +1,5 @@
 CREATE OR REPLACE
-    ALGORITHM = UNDEFINED
-    DEFINER = `root`@`localhost`
-    SQL SECURITY DEFINER
-VIEW `vw_bi_inadimplencia` AS
+VIEW `vw_bi_taxa_pagamento` AS
 SELECT
     f.codigo_raw AS codigo,
     f.id_empresa AS id_empresa,
@@ -16,19 +13,17 @@ SELECT
     f.valor_total AS valor_total,
     f.data_vencimento AS data_vencimento,
     f.data_baixa AS data_baixa,
-    f.dias_atraso AS dias_atraso,
     f.status_financeiro AS status_financeiro,
     f.descricao_situacao AS descricao_situacao,
     (
         SELECT MAX(fb.atualizado_em)
         FROM financeiro_bi fb
-    ) AS ultima_atualizacao
+    ) AS ultima_atualização
 FROM financeiro_bi f
 LEFT JOIN empresa_bi e
     ON e.codigo_empresa = f.id_empresa
 LEFT JOIN pessoa_bi p
     ON p.codigo_pessoa = f.id_pessoa
 WHERE
-    f.tipo_titulo = 'RECEBER'
-    AND f.status_financeiro = 'VENCIDO'
-    AND UPPER(f.descricao_situacao) IN ('EM ABERTO', 'TRÂNSITO');
+    f.tipo_titulo = 'PAGAR'
+    AND UPPER(f.descricao_situacao) IN ('EM ABERTO', 'TRÂNSITO', 'BAIXADO', 'BAIXADO PARCIAL')

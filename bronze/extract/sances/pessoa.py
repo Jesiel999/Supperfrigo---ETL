@@ -219,8 +219,8 @@ def extrair_financeiro(
     limit: int = 100,
     offset_inicial: int | None = None,
     extra_params: dict | None = None,
-    data_baixa_inicial: str | None = None,
-    data_baixa_final: str | None = None,
+    data_vencimento_inicial: str | None = None,
+    data_vencimento_final: str | None = None,
     data_insercao_inicial: str | None = None,
     data_insercao_final: str | None = None,
 ) -> list[dict]:
@@ -232,13 +232,13 @@ def extrair_financeiro(
     # ==========================================
     params_extra: dict = extra_params.copy() if extra_params else {}
 
-    if data_baixa_inicial:
-        params_extra["data_baixa_inicial"] = data_baixa_inicial
-        logger.info(f"Filtro data_baixa_inicial: {data_baixa_inicial}")
+    if data_vencimento_inicial:
+        params_extra["data_vencimento_inicial"] = data_vencimento_inicial
+        logger.info(f"Filtro data_vencimento_inicial: {data_vencimento_inicial}")
 
-    if data_baixa_final:
-        params_extra["data_baixa_final"] = data_baixa_final
-        logger.info(f"Filtro data_baixa_final: {data_baixa_final}")
+    if data_vencimento_final:
+        params_extra["data_vencimento_final"] = data_vencimento_final
+        logger.info(f"Filtro data_vencimento_final: {data_vencimento_final}")
 
     if data_insercao_inicial:
         params_extra["data_insercao_inicial"] = data_insercao_inicial
@@ -294,6 +294,11 @@ def extrair_financeiro(
                 f"Total extraído: {len(todos_registros)} registros."
             )
             extracao_ok = True
+            # ==========================================
+            # PÓS-LOOP: RESETA OU MANTÉM OFFSET
+            # ==========================================
+            if extracao_ok:
+                _resetar_offset(offset_file)
             break
 
         logger.info(f"Página {offset}: {len(dados)} registros recebidos.")
@@ -315,11 +320,6 @@ def extrair_financeiro(
         time.sleep(SLEEP_REQUEST)
         offset += 1
 
-    # ==========================================
-    # PÓS-LOOP: RESETA OU MANTÉM OFFSET
-    # ==========================================
-    if extracao_ok:
-        _resetar_offset()
     else:
         logger.warning(
             "Extração encerrada com falha. "

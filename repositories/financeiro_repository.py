@@ -1,6 +1,7 @@
 import logging
 from database.mysql_connection import connection_mysql
 from core.logger import get_layer_logger
+from datetime import datetime
 
 logger = get_layer_logger("bronze", "financeiro_repository")
 
@@ -27,10 +28,57 @@ def upsert_financeiro_raw(registros: list[dict]) -> dict:
     erros       = 0
     BATCH_COMMIT = 500
 
-    def _norm(valor) -> str:
+    def converter_data(valor):
         if valor is None:
-            return ""
-        return str(valor).strip()
+            return None
+
+        if isinstance(valor, datetime):
+            return valor
+
+        if isinstance(valor, str):
+            valor = valor.strip()
+
+            if not valor:
+                return None
+
+            formatos = (
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d",
+                "%Y-%m-%dT%H:%M:%S",
+                "%Y-%m-%dT%H:%M:%S.%f",
+            )
+
+            for formato in formatos:
+                try:
+                    return datetime.strptime(valor, formato)
+                except ValueError:
+                    pass
+
+        return None
+
+
+    def data_maior(data_nova, data_banco):
+        data_nova = converter_data(data_nova)
+        data_banco = converter_data(data_banco)
+
+        if data_nova is None:
+            return False
+
+        if data_banco is None:
+            return True
+
+        return data_nova > data_banco
+    
+    def situacao(situacao_nova, situacao_antiga):
+
+        if situacao_nova is None:
+            return False
+        
+        if situacao_antiga is None:
+            return True
+        
+        return situacao_nova != situacao_antiga
+    
 
     try:
         for i, item in enumerate(registros, start=1):
@@ -41,15 +89,25 @@ def upsert_financeiro_raw(registros: list[dict]) -> dict:
 
             # Verifica existência pelo codigo (chave única)
             cursor.execute(
-                "SELECT codigo, data_alteracao FROM financeiro_raw WHERE codigo = %s",
+                "SELECT codigo, data_alteracao, data_baixa, data_insercao, codigo_situacao FROM financeiro_raw WHERE codigo = %s",
                 (codigo,),
             )
             existente = cursor.fetchone()
 
             if existente:
-                if _norm(item.get("data_alteracao")) == _norm(existente.get("data_alteracao")):
+                
+                atualizar = (
+                    data_maior(item.get("data_alteracao"), existente.get("data_alteracao")) or
+                    data_maior(item.get("data_baixa"), existente.get("data_baixa")) or
+                    data_maior(item.get("data_insercao"), existente.get("data_insercao")) or
+                    situacao(item.get("codigo_situacao"), existente.get("codigo_situacao"))
+
+                )
+
+                if not atualizar:
                     ignorados += 1
                     continue
+
                 acao = "UPDATE"
             else:
                 acao = "INSERT"
@@ -119,16 +177,8 @@ def buscar_raw_para_transform(somente_nao_transformados: bool = True) -> list[di
 
     try:
         if somente_nao_transformados:
-            # LEFT JOIN: pega tudo do raw que não tem par no bi,
-            # ou cujo raw.atualizado_em é mais recente que o bi.atualizado_em
             sql = """
-                SELECT r.*
-                    FROM financeiro_raw r
-                    LEFT JOIN financeiro_bi b
-                        ON b.codigo_raw = r.codigo
-                    WHERE b.codigo_raw IS NULL
-
-                    OR r.data_alteracao > b.atualizado_em
+                SELECT * FROM financeiro_raw                    
             """
             logger.info("Buscando registros raw pendentes de transformação (LEFT JOIN)...")
         else:
@@ -167,6 +217,57 @@ def upsert_financeiro_bi(registros: list[dict]) -> dict:
     erros       = 0
     BATCH_COMMIT = 500
 
+    def converter_data(valor):
+        if valor is None:
+            return None
+
+        if isinstance(valor, datetime):
+            return valor
+
+        if isinstance(valor, str):
+            valor = valor.strip()
+
+            if not valor:
+                return None
+
+            formatos = (
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d",
+                "%Y-%m-%dT%H:%M:%S",
+                "%Y-%m-%dT%H:%M:%S.%f",
+            )
+
+            for formato in formatos:
+                try:
+                    return datetime.strptime(valor, formato)
+                except ValueError:
+                    pass
+
+        return None
+
+
+    def data_maior(data_nova, data_banco):
+        data_nova = converter_data(data_nova)
+        data_banco = converter_data(data_banco)
+
+        if data_nova is None:
+            return False
+
+        if data_banco is None:
+            return True
+
+        return data_nova > data_banco
+    
+    def situacao(situacao_nova, situacao_antiga):
+
+        if situacao_nova is None:
+            return False
+        
+        if situacao_antiga is None:
+            return True
+        
+        return situacao_nova != situacao_antiga
+    
     try:
         for i, item in enumerate(registros, start=1):
             codigo_raw = item.get("codigo_raw")
@@ -174,12 +275,18 @@ def upsert_financeiro_bi(registros: list[dict]) -> dict:
                 logger.warning(f"Registro sem codigo_raw — ignorado: {item}")
                 continue
 
-            # Verifica se já existe para contar corretamente INSERT vs UPDATE
-            cursor.execute(
-                "SELECT id FROM financeiro_bi WHERE codigo_raw = %s",
-                (codigo_raw,),
-            )
-            existe = cursor.fetchone()
+            # Verifica existência pelo codigo (chave única)
+            cursor.execute("""
+                SELECT
+                    atualizado_em,
+                    data_baixa,
+                    codigo_situacao
+                FROM financeiro_bi
+                WHERE codigo_raw = %s
+            """, (codigo_raw,))
+
+            
+            existente = cursor.fetchone()
 
             colunas      = list(item.keys())
             placeholders = [f"%({c})s" for c in colunas]
@@ -196,8 +303,17 @@ def upsert_financeiro_bi(registros: list[dict]) -> dict:
                     conn.reconnect(attempts=3, delay=5)
                 cursor.execute(sql, item)
 
-                if existe:
-                    atualizados += 1
+                if existente:
+                
+                    atualizar = (
+                        data_maior(item.get("data_alteracao"), existente.get("atualizado_em")) or
+                        data_maior(item.get("data_baixa"), existente.get("data_baixa")) or
+                        situacao(item.get("codigo_situacao"), existente.get("codigo_situacao"))
+                    )
+
+                    if not atualizar:
+                        atualizados += 1
+                        continue
                 else:
                     inseridos += 1
 
@@ -221,238 +337,3 @@ def upsert_financeiro_bi(registros: list[dict]) -> dict:
     )
     return {"inseridos": inseridos, "atualizados": atualizados, "erros": erros}
 
-
-# ==========================================
-# GOLD — inadimplencia_gold
-# ==========================================
-
-def upsert_inadimplencia_gold(registros: list[dict]) -> dict:
-    """
-    Insere ou atualiza registros na tabela inadimplencia_gold.
-    Antes de inserir, limpa os registros antigos da tabela
-    para refletir sempre o estado atual (TRUNCATE + INSERT).
-    """
-    conn   = connection_mysql()
-    cursor = conn.cursor(dictionary=True)
-    inseridos = erros = 0
-
-    try:
-        # Limpa a tabela gold antes de recarregar
-        # Garante que registros que saíram da inadimplência somam fora
-        cursor.execute("TRUNCATE TABLE inadimplencia_gold")
-        logger.info("inadimplencia_gold truncada para recarga completa.")
-
-        for item in registros:
-            if not item:
-                continue
-
-            colunas      = list(item.keys())
-            placeholders = [f"%({c})s" for c in colunas]
-
-            sql = f"""
-                INSERT INTO inadimplencia_gold ({', '.join(colunas)})
-                VALUES ({', '.join(placeholders)})
-            """
-
-            try:
-                cursor.execute(sql, item)
-                inseridos += 1
-            except Exception as e:
-                erros += 1
-                logger.error(f"Erro insert inadimplencia_gold: {e} | item={item}")
-
-        conn.commit()
-
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erro crítico upsert_inadimplencia_gold: {e}")
-        raise
-
-    finally:
-        cursor.close()
-        conn.close()
-
-    logger.info(f"inadimplencia_gold | INSERT={inseridos} ERRO={erros}")
-    return {"inseridos": inseridos, "erros": erros}
-
-
-def buscar_bi_para_inadimplencia_gold() -> list[dict]:
-    """
-    Retorna registros do financeiro_bi para a camada gold.
-    Traz títulos a RECEBER vencidos ou em aberto com vencimento anterior a hoje.
-    """
-    conn   = connection_mysql()
-    cursor = conn.cursor(dictionary=True)
-
-    try:
-        cursor.execute("""
-            SELECT *
-            FROM financeiro_bi
-            WHERE tipo_titulo = 'RECEBER'
-              AND status_financeiro IN ('VENCIDO', 'EM ABERTO', 'PAGO')
-            ORDER BY data_vencimento ASC
-        """)
-        rows = cursor.fetchall()
-        logger.info(f"financeiro_bi  gold: {len(rows)} registros inadimplentes encontrados.")
-        return rows
-
-    finally:
-        cursor.close()
-        conn.close()
-
-
-# ==========================================
-# GOLD — pmp_gold
-# ==========================================
-
-def upsert_pmp_gold(registros: list[dict]) -> dict:
-    """
-    Insere ou atualiza registros na tabela pmp_gold.
-    Antes de inserir, limpa os registros antigos da tabela
-    para refletir sempre o estado atual (TRUNCATE + INSERT).
-    """
-    conn   = connection_mysql()
-    cursor = conn.cursor(dictionary=True)
-    inseridos = erros = 0
-
-    try:
-        # Limpa a tabela gold antes de recarregar
-        # Garante que registros que saíram da inadimplência somam fora
-        cursor.execute("TRUNCATE TABLE pmp_gold")
-        logger.info("pmp_gold truncada para recarga completa.")
-
-        for item in registros:
-            if not item:
-                continue
-
-            colunas      = list(item.keys())
-            placeholders = [f"%({c})s" for c in colunas]
-
-            sql = f"""
-                INSERT INTO pmp_gold ({', '.join(colunas)})
-                VALUES ({', '.join(placeholders)})
-            """
-
-            try:
-                cursor.execute(sql, item)
-                inseridos += 1
-            except Exception as e:
-                erros += 1
-                logger.error(f"Erro insert pmp_gold: {e} | item={item}")
-
-        conn.commit()
-
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erro crítico upsert_pmp_gold: {e}")
-        raise
-
-    finally:
-        cursor.close()
-        conn.close()
-
-    logger.info(f"pmp_gold | INSERT={inseridos} ERRO={erros}")
-    return {"inseridos": inseridos, "erros": erros}
-
-
-def buscar_bi_para_pmp_gold() -> list[dict]:
-    """
-    Retorna registros do financeiro_bi para a camada gold.
-    Traz títulos a PAGAR PAGOS.
-    """
-    conn   = connection_mysql()
-    cursor = conn.cursor(dictionary=True)
-
-    try:
-        cursor.execute("""
-            SELECT *
-            FROM financeiro_bi
-            WHERE tipo_titulo = 'PAGAR'
-                AND status_financeiro IN ('PAGO')
-            ORDER BY codigo_raw ASC
-        """)
-        rows = cursor.fetchall()
-        logger.info(f"financeiro_bi  gold: {len(rows)} registros prazo medio de pagamento encontrados.")
-        return rows
-
-    finally:
-        cursor.close()
-        conn.close()
-
-# ==========================================
-# GOLD — pmr_gold
-# ==========================================
-
-def upsert_pmr_gold(registros: list[dict]) -> dict:
-    """
-    Insere ou atualiza registros na tabela pmr_gold.
-    Antes de inserir, limpa os registros antigos da tabela
-    para refletir sempre o estado atual (TRUNCATE + INSERT).
-    """
-    conn   = connection_mysql()
-    cursor = conn.cursor(dictionary=True)
-    inseridos = erros = 0
-
-    try:
-        # Limpa a tabela gold antes de recarregar
-        # Garante que registros que saíram da inadimplência somam fora
-        cursor.execute("TRUNCATE TABLE pmr_gold")
-        logger.info("pmr_gold truncada para recarga completa.")
-
-        for item in registros:
-            if not item:
-                continue
-
-            colunas      = list(item.keys())
-            placeholders = [f"%({c})s" for c in colunas]
-
-            sql = f"""
-                INSERT INTO pmr_gold ({', '.join(colunas)})
-                VALUES ({', '.join(placeholders)})
-            """
-
-            try:
-                cursor.execute(sql, item)
-                inseridos += 1
-            except Exception as e:
-                erros += 1
-                logger.error(f"Erro insert pmr_gold: {e} | item={item}")
-
-        conn.commit()
-
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erro crítico upsert_pmr_gold: {e}")
-        raise
-
-    finally:
-        cursor.close()
-        conn.close()
-
-    logger.info(f"pmr_gold | INSERT={inseridos} ERRO={erros}")
-    return {"inseridos": inseridos, "erros": erros}
-
-
-def buscar_bi_para_pmr_gold() -> list[dict]:
-    """
-    Retorna registros do financeiro_bi para a camada gold.
-    Traz títulos a RECEBER PAGOS.
-    """
-    conn   = connection_mysql()
-    cursor = conn.cursor(dictionary=True)
-
-    try:
-        cursor.execute("""
-            SELECT *
-            FROM financeiro_bi
-            WHERE tipo_titulo = 'RECEBER'
-                AND status_financeiro IN ('PAGO')
-            ORDER BY codigo_raw ASC
-        """)
-        rows = cursor.fetchall()
-        logger.info(f"financeiro_bi  gold: {len(rows)} registros prazo medio de recebimento encontrados.")
-        return rows
-
-    finally:
-        cursor.close()
-        conn.close()

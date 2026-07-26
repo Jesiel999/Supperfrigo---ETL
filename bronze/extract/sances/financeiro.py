@@ -21,7 +21,7 @@ class RateLimitAtingido(Exception):
     
 logger = get_layer_logger("bronze", "financeiro")
 
-HEADERS = {"Authorization": f"Bearer {SANCES_TOKEN}"}
+HEADERS = {"Authorization": f"Bearer {'SANCES_TOKEN'}"}
 
 # ==========================================
 # CAMPOS PERMITIDOS
@@ -375,6 +375,11 @@ def extrair_financeiro(
                 f"Total extraído: {len(todos_registros)} registros."
             )
             extracao_ok = True
+            # ==========================================
+            # PÓS-LOOP: RESETA OU MANTÉM OFFSET
+            # ==========================================
+            if extracao_ok:
+                _resetar_offset(offset_file)
             break
 
         logger.info(f"Página {offset} (situacao={codigo_situacao}): {len(dados)} registros recebidos.")
@@ -396,11 +401,6 @@ def extrair_financeiro(
         time.sleep(SLEEP_REQUEST)
         offset += 1
 
-    # ==========================================
-    # PÓS-LOOP: RESETA OU MANTÉM OFFSET
-    # ==========================================
-    if extracao_ok:
-        _resetar_offset(offset_file)
     else:
         logger.warning(
             "Extração encerrada com falha. "

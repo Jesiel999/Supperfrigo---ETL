@@ -235,3 +235,121 @@ def get_pmr(   # <-- renomeado (estava duplicado como get_pmp, sobrescrevia o no
     finally:
         cursor.close()
         conn.close()
+
+@router.get("/taxarecebimento")
+def get_taxa_recebimento(
+    id_empresa: Optional[str] = Query(None),
+    id_pessoa: Optional[str] = Query(None),
+    data_inicio: Optional[str] = Query(None),
+    data_fim: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+
+    """
+    Retorna registros do Receber evidenciando a taxa de recebimento
+    """
+
+    conn = connection_mysql()
+    cursor = conn.cursor(dictionary=True)
+
+    try: 
+        filtros = []
+        params  = []
+
+        permitidas = _empresas_permitidas(current_user)
+        _aplicar_filtro_empresa(filtros, params, id_empresa, permitidas)
+
+        if id_pessoa:
+            filtros.append("id_pessoa = %s")
+            params.append(id_pessoa)
+
+        if data_inicio:
+            filtros.append("data_vencimento >= %s")
+            params.append(data_inicio)
+
+        if data_fim:
+            filtros.append("data_vencimento <= %s")
+            params.append(data_fim)
+
+        where = f"WHERE {' AND '.join(filtros)}" if filtros else ""
+
+        cursor.execute(
+            f"SELECT * FROM vw_bi_taxa_recebimento {where}",
+            params,
+        )
+        rows = cursor.fetchall()
+
+        for row in rows:
+            for k, v in row.items():
+                if hasattr(v, "isoformat"):
+                    row[k] = v.isoformat()
+
+        return {"total": len(rows), "data": rows}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.get("/taxapagamento")
+def get_taxa_pagamento(
+    id_empresa: Optional[str] = Query(None),
+    id_pessoa: Optional[str] = Query(None),
+    data_inicio: Optional[str] = Query(None),
+    data_fim: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Retorna registros do Pagar evidenciando a taxa de pagamento
+    """
+
+    conn = connection_mysql()
+    cursor = conn.cursor(dictionary=True)
+
+    try: 
+        filtros = []
+        params  = []
+
+        permitidas = _empresas_permitidas(current_user)
+        _aplicar_filtro_empresa(filtros, params, id_empresa, permitidas)
+
+        if id_pessoa:
+            filtros.append("id_pessoa = %s")
+            params.append(id_pessoa)
+
+        if data_inicio:
+            filtros.append("data_vencimento >= %s")
+            params.append(data_inicio)
+
+        if data_fim:
+            filtros.append("data_vencimento <= %s")
+            params.append(data_fim)
+
+        where = f"WHERE {' AND '.join(filtros)}" if filtros else ""
+
+        cursor.execute(
+            f"SELECT * FROM vw_bi_taxa_pagamento {where}",
+            params,
+        )
+        rows = cursor.fetchall()
+
+        for row in rows:
+            for k, v in row.items():
+                if hasattr(v, "isoformat"):
+                    row[k] = v.isoformat()
+
+        return {"total": len(rows), "data": rows}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        cursor.close()
+        conn.close()
+

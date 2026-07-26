@@ -1,4 +1,5 @@
 from datetime import datetime
+import calendar
 from config.logging import setup_logging
 from pipelines.financeiro_pipeline import executar_pipeline_financeiro
 
@@ -9,19 +10,23 @@ setup_logging()
 MODOS_DIARIO = ["baixa", "insercao"]
 
 def executar_sances_diario():
-    hoje = datetime.now().strftime("%Y-%m-%d")
+    hoje = datetime.now()
+
+    primeiro_dia = hoje.replace(day=1)
+    ultimo_dia = hoje.replace(day=calendar.monthrange(hoje.year, hoje.month)[1])
+    
     resultados = []
 
     for modo in MODOS_DIARIO:
         if modo == "baixa":
             kwargs = dict(
-                data_baixa_inicial=hoje,
-                data_baixa_final=hoje,
+                data_vencimento_inicial=primeiro_dia,
+                data_vencimento_final=ultimo_dia,
             )
         else:  # insercao
             kwargs = dict(
-                data_insercao_inicial=hoje,
-                data_insercao_final=hoje,
+                data_insercao_inicial=primeiro_dia,
+                data_insercao_final=ultimo_dia,
             )
 
         resultado = executar_pipeline_financeiro(
