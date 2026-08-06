@@ -6,17 +6,13 @@ logger = get_layer_logger("bronze", "pessoa_sances")
 
 ORIGEM = "pessoa_sances"
 
-# O endpoint de pessoa já retorna endereco/email/telefone ANINHADOS dentro
-# do próprio registro (não são endpoints separados) — é na gravação
-# (repository) que esses blocos são distribuídos entre as 4 tabelas raw.
-# Ver repositories/pessoa_repository.py::upsert_pessoa_sances_completo.
 CAMPOS_PERMITIDOS = [
     "codigo_cliente", "tipo",
     "cpf_cnpj", "nome_cliente",
     "sexo",
-    "endereco", 
+    "endereco",
     "email",     
-    "telefone",
+    "telefone",  
 ]
 
 
@@ -24,9 +20,21 @@ def extrair_pessoa_sances(
     tenant_id: int,
     token: str | None = None,
     offset_inicial: int | None = None,
-    quantidade_por_execucao: int = 5000,
+    quantidade_por_execucao: int = 200,
 ) -> list[dict]:
+    """
+    Extrai pessoas da API Sances, UMA por chamada, via
+    GET {URL_PESSOA_SANCES}/{codigo_cliente}.
 
+    Esse endpoint NÃO é paginado por limit/offset: "dados" retorna um
+    objeto único (um cadastro), não uma lista. Por isso a varredura é
+    incremental por codigo_cliente (+1 a cada chamada), e o que fica salvo
+    em pipeline_offset é o PRÓXIMO codigo_cliente a buscar — em banco, não
+    mais em arquivo.
+
+    Para buscar um código específico (ex: reprocessar um cliente pontual),
+    chame com offset_inicial=<codigo> e quantidade_por_execucao=1.
+    """
     headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
 
     return extrair_por_codigo(

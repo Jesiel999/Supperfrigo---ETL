@@ -6,12 +6,12 @@ from database.mysql_connection import connection_mysql
 from bronze.extract.sances.financeiro import extrair_financeiro
 from silver.transform.sances.financeiro.financeiro import transformar_financeiro
 
-from repositories.financeiro_repository import (
+from repositories.sances.financeiro_repository import (
     upsert_financeiro_raw,
     buscar_raw_para_transform,
     upsert_financeiro_bi
 )
-from repositories.tenant_repository import buscar_config_tenant
+from repositories.tenant_repository import buscar_token_por_nome
 
 logger = logging.getLogger(__name__)
 
@@ -81,43 +81,6 @@ class StepTransformarFinanceiro(Step):
         logger.info(f"[SILVER] tenant={tenant_id} {resultado}")
         return context
 
-    def __init__(self):
-        super().__init__("ProcessarInadimplencia")
-
-    def execute(self, context: dict) -> dict:
-        tenant_id = context["tenant_id"]
-        resultado = processar_inadimplencia()
-        context["gold_resultado"] = resultado
-        logger.info(f"[GOLD] tenant={tenant_id} {resultado}")
-        return context
-
-class StepProcessarPmp(Step):
-    """Gold: processa Prazo medio de pagamento para o tenant."""
-
-    def __init__(self):
-        super().__init__("ProcessarPmp")
-
-    def execute(self, context: dict) -> dict:
-        tenant_id = context["tenant_id"]
-        resultado = processar_pmp()
-        context["gold_resultado"] = resultado
-        logger.info(f"[GOLD] tenant={tenant_id} {resultado}")
-        return context
-
-
-class StepProcessarPmr(Step):
-    """Gold: processa Prazo medio de recebimento para o tenant."""
-
-    def __init__(self):
-        super().__init__("ProcessarPmr")
-
-    def execute(self, context: dict) -> dict:
-        tenant_id = context["tenant_id"]
-        resultado = processar_pmr()
-        context["gold_resultado"] = resultado
-        logger.info(f"[GOLD] tenant={tenant_id} {resultado}")
-        return context
-
 
 # ── Interface pública ─────────────────────────────────────────
 
@@ -138,7 +101,7 @@ def executar_pipeline_financeiro(
     
     """
 
-    def buscar_config_tenant(tenant_id: int):
+    def buscar_token_por_nome(tenant_id: int):
         conn = connection_mysql()
         cursor = conn.cursor(dictionary=True)
 
@@ -160,7 +123,7 @@ def executar_pipeline_financeiro(
 
         return config
 
-    config = buscar_config_tenant(1)
+    config = buscar_token_por_nome(1)
     if not config:
         raise ValueError(f"Tenant {tenant_id} não encontrado ou sem configuração.")
 
@@ -181,9 +144,6 @@ def executar_pipeline_financeiro(
             offset_file=offset_file,
         ))
         .add_step(StepTransformarFinanceiro())
-        .add_step(StepProcessarInadimplencia())
-        .add_step(StepProcessarPmp())
-        .add_step(StepProcessarPmr())
     )
 
     return pipeline.run({"tenant_id": tenant_id})
