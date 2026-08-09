@@ -10,18 +10,22 @@ CAMPOS_PERMITIDOS = [
     "codigo_cliente", "tipo",
     "cpf_cnpj", "nome_cliente",
     "sexo",
-    "endereco", 
+    "endereco",
     "email",     
-    "telefone",
+    "telefone",  
 ]
+
 
 def extrair_pessoa_sances(
     tenant_id: int,
     token: str | None = None,
     offset_inicial: int | None = None,
-    quantidade_por_execucao: int = 5000,
+    quantidade_por_execucao: int = 200,
 ) -> list[dict]:
-
+    """
+    Extrai pessoas da API Sances, UMA por chamada, via
+    GET {URL_SANCES_PESSOA}/{codigo_cliente}.
+    """
     headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
 
     return extrair_por_codigo(
