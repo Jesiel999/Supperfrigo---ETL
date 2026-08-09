@@ -1,7 +1,7 @@
-
-CREATE TABLE email_sances_raw (
+CREATE TABLE IF NOT EXISTS email_sances_raw (
     id INT AUTO_INCREMENT PRIMARY KEY,
     pessoa_id INT NOT NULL,
+    tipo VARCHAR(20),
     email VARCHAR(500),
 
     CONSTRAINT fk_email_sances_pessoa

@@ -236,8 +236,8 @@ def get_pmr(
         cursor.close()
         conn.close()
 
-@router.get("/taxarecebimento")
-def get_taxa_recebimento(
+@router.get("/receber")
+def get_receber(
     id_empresa: Optional[str] = Query(None),
     id_pessoa: Optional[str] = Query(None),
     data_inicio: Optional[str] = Query(None),
@@ -274,7 +274,7 @@ def get_taxa_recebimento(
         where = f"WHERE {' AND '.join(filtros)}" if filtros else ""
 
         cursor.execute(
-            f"SELECT * FROM vw_bi_taxa_recebimento {where}",
+            f"SELECT * FROM vw_bi_receber {where}",
             params,
         )
         rows = cursor.fetchall()
@@ -295,8 +295,8 @@ def get_taxa_recebimento(
         cursor.close()
         conn.close()
 
-@router.get("/taxapagamento")
-def get_taxa_pagamento(
+@router.get("/pagar")
+def get_pagar(
     id_empresa: Optional[str] = Query(None),
     id_pessoa: Optional[str] = Query(None),
     data_inicio: Optional[str] = Query(None),
@@ -332,7 +332,7 @@ def get_taxa_pagamento(
         where = f"WHERE {' AND '.join(filtros)}" if filtros else ""
 
         cursor.execute(
-            f"SELECT * FROM vw_bi_taxa_pagamento {where}",
+            f"SELECT * FROM vw_bi_pagar {where}",
             params,
         )
         rows = cursor.fetchall()

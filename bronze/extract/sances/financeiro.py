@@ -71,13 +71,6 @@ CAMPOS_DATA = [
     "data_cancelamento", "data_baixa", "data_aprovacao",
 ]
 
-# ==========================================
-# ARQUIVO DE CONTROLE DE OFFSET
-# Guarda a página atual da extração.
-# Resetado para 1 ao terminar com sucesso.
-# Mantido no valor atual ao falhar, para
-# retomar da página onde parou.
-# ==========================================
 OFFSET_FILE = "logs/bronze/financeiro_offset.txt"
 
 
@@ -257,8 +250,8 @@ def extrair_financeiro(
     limit: int = 100,
     offset_inicial: int | None = None,
     extra_params: dict | None = None,
-    data_baixa_inicial: str | None = None,
-    data_baixa_final: str | None = None,
+    data_vencimento_inicial: str | None = None,
+    data_vencimento_final: str | None = None,
     data_insercao_inicial: str | None = None,
     data_insercao_final: str | None = None,
     codigo_situacao: str | None = None,
@@ -279,9 +272,9 @@ def extrair_financeiro(
         limit:               Registros por página. Máximo 100 (limite da API).
         offset_inicial:      Força início em uma página específica.
                              Se None, usa o offset salvo ou começa do 1.
-        data_baixa_inicial:  Filtra registros com data_baixa >= este valor.
+        data_vencimento_inicial:Filtra registros com data_baixa >= este valor.
                              Formato: "YYYY-MM-DD". Ex: "2024-01-01"
-        data_baixa_final:    Filtra registros com data_baixa <= este valor.
+        data_vencimento_final:Filtra registros com data_baixa <= este valor.
                              Formato: "YYYY-MM-DD". Ex: "2024-12-31"
                              Se None, traz até a data de hoje.
         data_insercao_inicial:  Filtra registros com data_vencimento >= este valor.
@@ -308,13 +301,13 @@ def extrair_financeiro(
     # ==========================================
     params_extra: dict = extra_params.copy() if extra_params else {}
 
-    if data_baixa_inicial:
-        params_extra["data_baixa_inicial"] = data_baixa_inicial
-        logger.info(f"Filtro data_baixa_inicial: {data_baixa_inicial}")
+    if data_vencimento_inicial:
+        params_extra["data_vencimento_inicial"] = data_vencimento_inicial
+        logger.info(f"Filtro data_vencimento_inicial: {data_vencimento_inicial}")
 
-    if data_baixa_final:
-        params_extra["data_baixa_final"] = data_baixa_final
-        logger.info(f"Filtro data_baixa_final: {data_baixa_final}")
+    if data_vencimento_final:
+        params_extra["data_vencimento_final"] = data_vencimento_final
+        logger.info(f"Filtro data_vencimento_final: {data_vencimento_final}")
 
     if data_insercao_inicial:
         params_extra["data_insercao_inicial"] = data_insercao_inicial

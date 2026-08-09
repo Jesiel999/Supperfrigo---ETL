@@ -1,5 +1,5 @@
 CREATE OR REPLACE
-VIEW `vw_bi_taxa_pagamento` AS
+VIEW `vw_bi_pagar` AS
 SELECT
     f.codigo_raw AS codigo,
     f.id_empresa AS id_empresa,
