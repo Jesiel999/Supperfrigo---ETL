@@ -52,7 +52,7 @@ def _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger
         return None
 
     # Alguns endpoints (Sults) devolvem uma lista pura no nível raiz.
-    # Outros (Sances) envelopam em {"dados": [...]}. Aceita os dois formatos.
+    # Aceita os dois formatos.
     if isinstance(corpo, list):
         return corpo
     if isinstance(corpo, dict):
@@ -80,19 +80,7 @@ def extrair_paginado(
     valor_padrao_pagina: int = 1,
 ) -> list[dict]:
     """
-    Extrator paginado genérico (reutilizado por pessoa/telefone/email/endereco,
-    tanto Sances quanto Sults).
-
-    O offset agora é lido/salvo/resetado no banco (tabela pipeline_offset),
-    identificado por (tenant_id, origem) — não depende mais de arquivo em disco.
-
-    nome_param_pagina / valor_padrao_pagina: nem toda API pagina com o
-    mesmo nome de parâmetro nem começando do mesmo número — ex: Sults usa
-    `start` começando em 0, não `offset` começando em 1.
-
-    Returns:
-        Lista de dicts já filtrados pelos campos_permitidos. Registros sem a
-        chave_obrigatoria preenchida são descartados.
+    Extrator paginado genérico
     """
     params_extra = extra_params.copy() if extra_params else {}
     offset = ler_offset(tenant_id, origem, offset_inicial, valor_padrao=valor_padrao_pagina)
@@ -134,14 +122,6 @@ def extrair_paginado(
 
     logger.info(f"[{origem}] Extração finalizada | tenant={tenant_id} | registros={len(todos_registros)}")
     return todos_registros
-
-
-# ==========================================
-# EXTRAÇÃO POR CÓDIGO INCREMENTAL
-# Para endpoints que NÃO são paginados por limit/offset — buscam UM
-# registro por vez via GET {url_base}/{codigo}. Ex: pessoa Sances, cujo
-# "dados" retorna um objeto único, não uma lista.
-# ==========================================
 
 def _fetch_um(url, headers, timeout, codigo, tenant_id, origem, logger):
     """Busca um único registro por código. Retorna o dict de "dados", ou None se não existir/falhar."""

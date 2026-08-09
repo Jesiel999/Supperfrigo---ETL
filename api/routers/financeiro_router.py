@@ -174,7 +174,7 @@ def get_pmp(
 
 
 @router.get("/pmr")
-def get_pmr(   # <-- renomeado (estava duplicado como get_pmp, sobrescrevia o nome)
+def get_pmr(  
     id_empresa: Optional[str] = Query(None),
     id_pessoa:  Optional[str] = Query(None),
     data_inicio: Optional[str] = Query(None),

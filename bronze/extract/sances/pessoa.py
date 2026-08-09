@@ -1,4 +1,4 @@
-from config.settings import SANCES_TOKEN, URL_PESSOA_SANCES, REQUEST_TIMEOUT, SLEEP_REQUEST
+from config.settings import SANCES_TOKEN, URL_SANCES_PESSOA, REQUEST_TIMEOUT, SLEEP_REQUEST
 from core.logger import get_layer_logger
 from bronze.extract._base import extrair_por_codigo
 
@@ -6,10 +6,6 @@ logger = get_layer_logger("bronze", "pessoa_sances")
 
 ORIGEM = "pessoa_sances"
 
-# O endpoint de pessoa já retorna endereco/email/telefone ANINHADOS dentro
-# do próprio registro (não são endpoints separados) — é na gravação
-# (repository) que esses blocos são distribuídos entre as 4 tabelas raw.
-# Ver repositories/pessoa_repository.py::upsert_pessoa_sances_completo.
 CAMPOS_PERMITIDOS = [
     "codigo_cliente", "tipo",
     "cpf_cnpj", "nome_cliente",
@@ -18,7 +14,6 @@ CAMPOS_PERMITIDOS = [
     "email",     
     "telefone",
 ]
-
 
 def extrair_pessoa_sances(
     tenant_id: int,
@@ -30,7 +25,7 @@ def extrair_pessoa_sances(
     headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
 
     return extrair_por_codigo(
-        url_base=URL_PESSOA_SANCES,
+        url_base=URL_SANCES_PESSOA,
         headers=headers,
         origem=ORIGEM,
         tenant_id=tenant_id,

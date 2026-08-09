@@ -5,18 +5,7 @@ logger = logging.getLogger(__name__)
 
 
 def transformar_pessoa(raw: dict, tenant_id: int) -> list[dict]:
-    """
-    Une os registros de pessoa_sances_raw e pessoa_sults_raw em uma única
-    lista de pessoas para pessoa_bi.
-
-    Critério de match: CPF/CNPJ normalizado (somente dígitos). Quando não
-    há CPF em nenhum dos dois lados, o registro entra como pessoa isolada
-    (não é possível casar com segurança sem chave).
-
-    colaborador: marcado como 1 quando a pessoa existe no Sults (sistema
-    de colaboradores), 0 caso exista apenas no Sances. Ajuste essa regra
-    se a definição de "colaborador" for outra.
-    """
+    
     sances = raw.get("sances", [])
     sults = raw.get("sults", [])
 

@@ -8,7 +8,7 @@ from datetime import datetime
 
 from config.settings import (
     SANCES_TOKEN,
-    URL_FINANCEIRO,
+    URL_SANCES_FINANCEIRO,
     REQUEST_TIMEOUT,
     RATE_LIMIT_SLEEP,
     SLEEP_REQUEST,
@@ -186,7 +186,7 @@ def _fetch_page(
     while True:
         try:
             response = requests.get(
-                URL_FINANCEIRO,
+                URL_SANCES_FINANCEIRO,
                 headers=HEADERS,
                 params=params,
                 timeout=REQUEST_TIMEOUT,
@@ -218,7 +218,7 @@ def _fetch_page(
                 f"Erro HTTP {response.status_code} na página {offset}: "
                 f"{response.text[:300]}"
             )
-            _salvar_offset(offset, offset_file)  # guarda para retomar depois
+            _salvar_offset(offset, offset_file)
             return None
 
         except Timeout:
@@ -327,7 +327,7 @@ def extrair_financeiro(
     offset = _ler_offset(offset_inicial, offset_file)
 
     todos_registros: list[dict] = []
-    extracao_ok = False  # flag: True apenas se terminou naturalmente (sem erro)
+    extracao_ok = False
 
     # ==========================================
     # LOOP DE PAGINAÇÃO
@@ -336,8 +336,6 @@ def extrair_financeiro(
 
         # ==========================================
         # FALHA DEFINITIVA NA API
-        # Offset já foi salvo dentro de _fetch_page.
-        # Retoma da mesma página na próxima execução.
         # ==========================================
 
         try:
@@ -359,8 +357,6 @@ def extrair_financeiro(
 
         # ==========================================
         # FIM DOS DADOS
-        # API retornou lista vazia = não há mais páginas.
-        # Marca extração como bem-sucedida.
         # ==========================================
         if not dados:
             logger.info(
@@ -368,9 +364,7 @@ def extrair_financeiro(
                 f"Total extraído: {len(todos_registros)} registros."
             )
             extracao_ok = True
-            # ==========================================
-            # PÓS-LOOP: RESETA OU MANTÉM OFFSET
-            # ==========================================
+            
             if extracao_ok:
                 _resetar_offset(offset_file)
             break
@@ -387,8 +381,6 @@ def extrair_financeiro(
 
         # ==========================================
         # SALVA PROGRESSO E AVANÇA
-        # Garante que, se o processo morrer durante
-        # o processamento, não perde a página atual.
         # ==========================================
         _salvar_offset(offset, offset_file)
         time.sleep(SLEEP_REQUEST)

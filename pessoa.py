@@ -1,4 +1,4 @@
-from config.settings import SANCES_TOKEN, URL_PESSOA_SANCES, REQUEST_TIMEOUT, SLEEP_REQUEST
+from config.settings import SANCES_TOKEN, URL_SANCES_PESSOA, REQUEST_TIMEOUT, SLEEP_REQUEST
 from core.logger import get_layer_logger
 from bronze.extract._base import extrair_por_codigo
 
@@ -24,21 +24,12 @@ def extrair_pessoa_sances(
 ) -> list[dict]:
     """
     Extrai pessoas da API Sances, UMA por chamada, via
-    GET {URL_PESSOA_SANCES}/{codigo_cliente}.
-
-    Esse endpoint NÃO é paginado por limit/offset: "dados" retorna um
-    objeto único (um cadastro), não uma lista. Por isso a varredura é
-    incremental por codigo_cliente (+1 a cada chamada), e o que fica salvo
-    em pipeline_offset é o PRÓXIMO codigo_cliente a buscar — em banco, não
-    mais em arquivo.
-
-    Para buscar um código específico (ex: reprocessar um cliente pontual),
-    chame com offset_inicial=<codigo> e quantidade_por_execucao=1.
+    GET {URL_SANCES_PESSOA}/{codigo_cliente}.
     """
     headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
 
     return extrair_por_codigo(
-        url_base=URL_PESSOA_SANCES,
+        url_base=URL_SANCES_PESSOA,
         headers=headers,
         origem=ORIGEM,
         tenant_id=tenant_id,

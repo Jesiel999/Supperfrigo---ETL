@@ -1,4 +1,4 @@
-from config.settings import URL_PESSOA_SULTS, REQUEST_TIMEOUT, SLEEP_REQUEST
+from config.settings import URL_SULTS_PESSOA, REQUEST_TIMEOUT, SLEEP_REQUEST
 from core.logger import get_layer_logger
 from bronze.extract._base import extrair_paginado
 
@@ -24,7 +24,7 @@ def extrair_pessoa_sults(
     headers = {"Authorization": token}
 
     return extrair_paginado(
-        url=URL_PESSOA_SULTS,
+        url=URL_SULTS_PESSOA,
         headers=headers,
         origem=ORIGEM,
         tenant_id=tenant_id,
