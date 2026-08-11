@@ -3,6 +3,7 @@ from core.logger import get_layer_logger
 
 logger = get_layer_logger("silver", "financeiro_transform")
 
+SITUACOES_TERMINAIS = {"CANCELADO", "UNIDO", "RENEGOCIADO"}
 
 def _to_date(valor) -> date | None:
     if valor is None:
@@ -35,49 +36,35 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
             
             descricao_situacao = str(raw.get("descricao_situacao") or "").strip().upper()
 
-            if descricao_situacao in {"CANCELADO", "UNIDO", "RENEGOCIADO"}:
-                continue
-            
-            # status_financeiro
-            if data_baixa:
-                status_financeiro = "PAGO"
-            elif data_vencimento and data_vencimento < hoje:
-                status_financeiro = "VENCIDO"
+            if descricao_situacao in SITUACOES_TERMINAIS:
+                status_financeiro = descricao_situacao
+                dias_atraso = None
+                dias_pagamento = None
+                dias_recebimento = None
             else:
-                status_financeiro = "EM ABERTO"
-
-            # dias_atraso
-            dias_atraso: int | None = None
-
-            if (
-                data_baixa is None
-                and data_vencimento
-                and data_vencimento < date.today()
-            ):
-                dias_atraso = (date.today() - data_vencimento).days
-
+                # status_financeiro
+                if data_baixa:
+                    status_financeiro = "PAGO"
+                elif data_vencimento and data_vencimento < hoje:
+                    status_financeiro = "VENCIDO"
+                else:
+                    status_financeiro = "EM ABERTO"
+            
+             # dias_atraso
+            dias_atraso = None
+            if data_baixa is None and data_vencimento and data_vencimento < hoje:
+                dias_atraso = (hoje - data_vencimento).days
 
             # dias_pagamento
-            dias_pagamento: int | None = None
-
-            if (
-                raw.get("tipo_titulo") == "PAGAR"
-                and data_emissao
-                and data_baixa
-            ):
+            dias_pagamento = None
+            if raw.get("tipo_titulo") == "PAGAR" and data_emissao and data_baixa:
                 dias_pagamento = (data_baixa - data_emissao).days
 
-
             # dias_recebimento
-            dias_recebimento: int | None = None
-
-            if (
-                raw.get("tipo_titulo") == "RECEBER"
-                and data_emissao
-                and data_baixa
-            ):
+            dias_recebimento = None
+            if raw.get("tipo_titulo") == "RECEBER" and data_emissao and data_baixa:
                 dias_recebimento = (data_baixa - data_emissao).days
-
+                    
             bi = {
                 # ── Chave obrigatória ────────────────────────
                 "tenant_id":                   tenant_id,

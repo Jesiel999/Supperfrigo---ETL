@@ -68,9 +68,9 @@ def extrair_paginado(
     headers: dict,
     origem: str,
     tenant_id: int,
-    campos_permitidos: list[str],
-    chave_obrigatoria: str,
     logger: logging.Logger,
+    campos_permitidos: list[str] | None = None,
+    chave_obrigatoria: str | None = None,
     limit: int = 100,
     offset_inicial: int | None = None,
     extra_params: dict | None = None,
@@ -78,6 +78,7 @@ def extrair_paginado(
     sleep_request: float = 1.0,
     nome_param_pagina: str = "offset",
     valor_padrao_pagina: int = 1,
+    on_page=None,
 ) -> list[dict]:
     """
     Extrator paginado genérico
@@ -122,6 +123,65 @@ def extrair_paginado(
 
     logger.info(f"[{origem}] Extração finalizada | tenant={tenant_id} | registros={len(todos_registros)}")
     return todos_registros
+
+def extrair_paginado_estoque(
+    url: str,
+    headers: dict,
+    origem: str,
+    tenant_id: int,
+    on_page,  
+    logger: logging.Logger,
+    limit: int = 100,
+    offset_inicial: int | None = None,
+    extra_params: dict | None = None,
+    timeout: int = 30,
+    sleep_request: float = 1.0,
+    nome_param_pagina: str = "offset",
+    valor_padrao_pagina: int = 1,
+) -> dict:
+    params_extra = extra_params.copy() if extra_params else {}
+    offset = ler_offset(tenant_id, origem, offset_inicial, valor_padrao=valor_padrao_pagina)
+    paginas = 0
+    total_registros = 0
+
+    while True:
+        params = {"limit": limit, nome_param_pagina: offset, **params_extra}
+
+        try:
+            dados = _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger)
+        except RateLimitAtingido:
+            logger.warning(f"[{origem}] Extração interrompida por rate limit na página {offset}.")
+            return {"paginas": paginas, "registros": total_registros, "status": "RATE_LIMIT"}
+
+        if dados is None:
+            logger.warning(f"[{origem}] Extração encerrada com falha na página {offset}. Offset NÃO avançado.")
+            return {"paginas": paginas, "registros": total_registros, "status": "ERRO"}
+
+        qtd = len(dados)
+
+        # Fim da paginação: página sem registros.
+        if qtd == 0:
+            logger.info(f"[{origem}] Página {offset} vazia — fim dos registros. Total: {total_registros}")
+            resetar_offset(tenant_id, origem, valor_padrao=valor_padrao_pagina)
+            return {"paginas": paginas, "registros": total_registros, "status": "CONCLUIDO"}
+
+        # Persiste a página ANTES de avançar o offset — se isso falhar, o
+        # offset fica exatamente onde estava, e a próxima execução reprocessa
+        # esta mesma página (não perde nem duplica).
+        try:
+            on_page(dados, offset, limit)
+        except Exception as e:
+            logger.error(f"[{origem}] Falha ao persistir página {offset} na Bronze: {e}. Offset NÃO avançado.")
+            return {"paginas": paginas, "registros": total_registros, "status": "ERRO"}
+
+        logger.info(f"[{origem}] Página {offset}: {qtd} registros persistidos na Bronze.")
+        paginas += 1
+        total_registros += qtd
+
+        salvar_offset(tenant_id, origem, offset)
+        time.sleep(sleep_request)
+        offset += 1
+
 
 def _fetch_um(url, headers, timeout, codigo, tenant_id, origem, logger):
     """Busca um único registro por código. Retorna o dict de "dados", ou None se não existir/falhar."""

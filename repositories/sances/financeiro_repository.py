@@ -101,7 +101,6 @@ def upsert_financeiro_raw(registros: list[dict]) -> dict:
                     data_maior(item.get("data_baixa"), existente.get("data_baixa")) or
                     data_maior(item.get("data_insercao"), existente.get("data_insercao")) or
                     situacao(item.get("codigo_situacao"), existente.get("codigo_situacao"))
-
                 )
 
                 if not atualizar:
@@ -207,13 +206,14 @@ def upsert_financeiro_bi(registros: list[dict]) -> dict:
     """
     if not registros:
         logger.warning("upsert_financeiro_bi chamado com lista vazia — nada a gravar.")
-        return {"inseridos": 0, "atualizados": 0, "erros": 0}
+        return {"inseridos": 0, "atualizados": 0, "ignorados": 0, "erros": 0}
 
     conn   = connection_mysql()
     cursor = conn.cursor(dictionary=True)
 
     inseridos   = 0
     atualizados = 0
+    ignorados = 0
     erros       = 0
     BATCH_COMMIT = 500
 
@@ -273,6 +273,7 @@ def upsert_financeiro_bi(registros: list[dict]) -> dict:
             codigo_raw = item.get("codigo_raw")
             if not codigo_raw:
                 logger.warning(f"Registro sem codigo_raw — ignorado: {item}")
+                ignorados += 1
                 continue
 
             # Verifica existência pelo codigo (chave única)
@@ -312,7 +313,7 @@ def upsert_financeiro_bi(registros: list[dict]) -> dict:
                     )
 
                     if not atualizar:
-                        atualizados += 1
+                        ignorados += 1
                         continue
                 else:
                     inseridos += 1
@@ -333,7 +334,6 @@ def upsert_financeiro_bi(registros: list[dict]) -> dict:
         conn.close()
 
     logger.info(
-        f"financeiro_bi | INSERT={inseridos} UPDATE={atualizados} ERRO={erros}"
+        f"financeiro_bi | INSERT={inseridos} UPDATE={atualizados} IGNORADOS={ignorados} ERRO={erros}"
     )
-    return {"inseridos": inseridos, "atualizados": atualizados, "erros": erros}
-
+    return {"inseridos": inseridos, "atualizados": atualizados, "ignorados": ignorados, "erros": erros}

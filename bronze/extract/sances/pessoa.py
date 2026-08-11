@@ -22,7 +22,7 @@ def extrair_pessoa_sances(
     quantidade_por_execucao: int = 5000,
 ) -> list[dict]:
 
-    headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
+    headers = {"Authorization": f"Bearer {'token' or 'SANCES_TOKEN'}"}
 
     return extrair_por_codigo(
         url_base=URL_SANCES_PESSOA,

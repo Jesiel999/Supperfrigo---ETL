@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS empresa_sults_raw (
     qualificacao_id INT,
 
     nomeFantasia_id INT,
+    nomeFantasia VARCHAR(255),
     nomeFantasia_cargo_nome VARCHAR(100),
     nomeFantasia_cargo_id INT,
 

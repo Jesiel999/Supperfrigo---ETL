@@ -58,3 +58,87 @@ def resetar_offset(tenant_id: int, origem: str, valor_padrao: int = 1) -> None:
     """
     salvar_offset(tenant_id, origem, valor_padrao)
     logger.info(f"[{origem}] tenant={tenant_id} | Offset resetado para {valor_padrao}.")
+
+def marcar_inicio_execucao(tenant_id: int, origem: str, endpoint: str) -> None:
+    """Chamar no início de cada execução da pipeline, antes de qualquer request."""
+    conn = connection_mysql()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO pipeline_offset (tenant_id, origem, endpoint, status, ultima_execucao)
+        VALUES (%s, %s, %s, 'EM_EXECUCAO', NOW())
+        ON DUPLICATE KEY UPDATE
+            endpoint = VALUES(endpoint),
+            status = 'EM_EXECUCAO',
+            ultima_execucao = NOW()
+        """,
+        (tenant_id, origem, endpoint),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def registrar_pagina_processada(tenant_id: int, origem: str, offset: int, qtd_registros: int) -> None:
+    """
+    Chamar SOMENTE depois que a página já foi persistida com sucesso na Bronze.
+    Avança offset_atual, soma registros_processados e marca ultimo_sucesso —
+    tudo num único UPDATE (mesmo "commit" lógico do avanço de offset).
+    """
+    conn = connection_mysql()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE pipeline_offset
+        SET offset_atual = %s,
+            registros_processados = registros_processados + %s,
+            status = 'EM_EXECUCAO',
+            ultimo_sucesso = NOW()
+        WHERE tenant_id = %s AND origem = %s
+        """,
+        (offset, qtd_registros, tenant_id, origem),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def marcar_concluido(tenant_id: int, origem: str, valor_padrao_offset: int = 1) -> None:
+    """Fim da paginação (página vazia) — reseta offset e marca status CONCLUIDO."""
+    conn = connection_mysql()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE pipeline_offset
+        SET offset_atual = %s,
+            status = 'CONCLUIDO',
+            ultimo_sucesso = NOW()
+        WHERE tenant_id = %s AND origem = %s
+        """,
+        (valor_padrao_offset, tenant_id, origem),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    logger.info(f"[{origem}] tenant={tenant_id} | status=CONCLUIDO, offset resetado para {valor_padrao_offset}.")
+
+
+def marcar_erro(tenant_id: int, origem: str, erro: str) -> None:
+    """
+    Registra falha SEM alterar offset_atual — é isso que garante que a
+    próxima execução retoma exatamente do mesmo lugar.
+    """
+    conn = connection_mysql()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE pipeline_offset
+        SET status = 'ERRO',
+            ultimo_erro = %s
+        WHERE tenant_id = %s AND origem = %s
+        """,
+        (erro[:5000], tenant_id, origem),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    logger.error(f"[{origem}] tenant={tenant_id} | status=ERRO | offset NÃO avançado | {erro}")

@@ -4,6 +4,7 @@ from run_pipeline_sances_financeiro import executar_sances_diario
 from run_pipeline_sances_financeiro_total import executar_sances_total
 from run_pipeline_sults import executar_sults
 from run_pipeline_sances_pessoa import executar_sances_pessoa
+from run_pipeline_sances_estoque import executar_sances_estoque
 
 from datetime import datetime
 
@@ -13,13 +14,16 @@ from apscheduler.triggers.combining import OrTrigger
 scheduler = BackgroundScheduler()
 
 def job_sances_financeiro_diario():
-    job_sances_financeiro_diario()
+    executar_sances_diario()
 
 def job_sances_financeiro_total():
-    job_sances_financeiro_total()
+    executar_sances_total()
 
 def job_sances_pessoa():
     executar_sances_pessoa()
+
+def job_sances_estoque():
+    executar_sances_estoque()
 
 def job_sults():
     executar_sults()
@@ -81,6 +85,19 @@ def iniciar_scheduler():
         coalesce=True,
         replace_existing=True,
         id="etl_pessoa_sances",
+    )
+
+    # ESTOQUE -> 30 em 30 minutos
+    trigger_estoque = CronTrigger(minute="0,30")
+    scheduler.add_job(
+        job_sances_estoque,
+        trigger_estoque,
+        max_instances=1,
+        misfire_grace_time=300,
+        next_run_time=datetime.now(),
+        coalesce=True,
+        replace_existing=True,
+        id="etl_estoque_sances",
     )
 
 
