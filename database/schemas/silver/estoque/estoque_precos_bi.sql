@@ -1,0 +1,21 @@
+CREATE TABLE `estoque_precos_bi` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `tenant_id` int NOT NULL,
+  `codigo_produto` int NOT NULL,
+  `codigo_empresa` int NOT NULL,
+  `cnpj` varchar(20) COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `custo_medio` decimal(14,4) DEFAULT NULL,
+  `venda_varejo` decimal(14,4) DEFAULT NULL,
+  `venda_atacado` decimal(14,4) DEFAULT NULL,
+  `venda_ecommerce` decimal(14,4) DEFAULT NULL,
+  `garantia` decimal(14,4) DEFAULT NULL,
+  `sugerido` decimal(14,4) DEFAULT NULL,
+  `reposicao` decimal(14,4) DEFAULT NULL,
+  `promocao` decimal(14,4) DEFAULT NULL,
+  `personalizado1` decimal(14,4) DEFAULT NULL,
+  `personalizado3` decimal(14,4) DEFAULT NULL,
+  `data_processamento` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_estoque_precos_tenant_produto_empresa` (`tenant_id`,`codigo_produto`,`codigo_empresa`),
+  CONSTRAINT `fk_estoque_precos_produto` FOREIGN KEY (`tenant_id`, `codigo_produto`) REFERENCES `estoque_produto_bi` (`tenant_id`, `codigo_produto`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=121668 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

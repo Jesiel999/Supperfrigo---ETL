@@ -23,7 +23,7 @@ def _upsert_produto(tenant_id: int, codigo_produto: int, p: dict, agora: datetim
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO estoque_produto
+        INSERT INTO estoque_produto_bi
             (tenant_id, codigo_produto, descricao, referencia, referencia_fabrica, codigo_ean, codigo_barras,
              sigla_unidade_medida, descricao_unidade_medida, codigo_categoria, descricao_categoria,
              descricao_grupo, descricao_subgrupo, endereco_setor, endereco_rua, endereco_andar, ativo,
@@ -67,7 +67,7 @@ def _upsert_preco(tenant_id: int, codigo_produto: int, pr: dict, agora: datetime
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO estoque_precos
+        INSERT INTO estoque_precos_bi
             (tenant_id, codigo_produto, codigo_empresa, cnpj, custo_medio, venda_varejo, venda_atacado,
              venda_ecommerce, garantia, sugerido, reposicao, promocao, personalizado1, personalizado3,
              data_processamento)
@@ -96,7 +96,7 @@ def _upsert_empresa(tenant_id: int, codigo_produto: int, e: dict, agora: datetim
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO estoque_empresa
+        INSERT INTO estoque_empresa_bi
             (tenant_id, codigo_produto, codigo_empresa, cnpj, nome_razao, nome_fantasia, apelido,
              qtd_estoque, qtd_aplicadas, qtd_reservada, qtd_transito, qtd_pedido, qtd_bo, data_processamento)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -123,7 +123,7 @@ def _upsert_modelo(tenant_id: int, codigo_produto: int, m: dict, agora: datetime
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO estoque_modelo_veiculo
+        INSERT INTO estoque_modelo_veiculo_bi
             (tenant_id, codigo_produto, codigo_modelo, descricao_modelo, data_processamento)
         VALUES (%s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
@@ -145,7 +145,7 @@ def _mais_recente_por_chave(linhas: list[dict], campo_chave: str) -> dict:
     resultado = {}
     for linha in linhas:
         chave = linha[campo_chave]
-        if chave not in resultado:
+        if chave not in resultado: 
             resultado[chave] = linha
     return resultado
 

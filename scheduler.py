@@ -67,7 +67,7 @@ def iniciar_scheduler():
         misfire_grace_time=300,
         coalesce=True,
         replace_existing=True,
-        next_run_time=datetime.now(),
+        # next_run_time=datetime.now(),
         id="etl_chamados",
     )
 
@@ -81,7 +81,7 @@ def iniciar_scheduler():
         trigger_pessoa,
         max_instances=1,
         misfire_grace_time=300,
-        next_run_time=datetime.now(),
+        # next_run_time=datetime.now(),
         coalesce=True,
         replace_existing=True,
         id="etl_pessoa_sances",
@@ -94,7 +94,7 @@ def iniciar_scheduler():
         trigger_estoque,
         max_instances=1,
         misfire_grace_time=300,
-        next_run_time=datetime.now(),
+        # next_run_time=datetime.now(),
         coalesce=True,
         replace_existing=True,
         id="etl_estoque_sances",

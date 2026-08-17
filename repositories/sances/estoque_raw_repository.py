@@ -12,13 +12,7 @@ def salvar_pagina_raw(
     itens: list[dict],
 ) -> None:
     """
-    Grava uma página inteira nas 4 tabelas Bronze (append-only, sem
-    upsert). Cada `item` é um produto com os blocos aninhados originais
-    da API (referenciaFabrica, precos, estoque, modeloVeiculo).
-
-    Levanta exceção se qualquer INSERT falhar — quem chama (bronze/extract/
-    sances/estoque.py) depende disso pra NÃO avançar o offset em caso de
-    falha na gravação.
+    Grava nas 4 tabelas Bronze
     """
     if not itens:
         return
@@ -73,7 +67,7 @@ def salvar_pagina_raw(
 
             for m in (item.get("modeloVeiculo") or []):
                 if not m.get("codigoModelo"):
-                    continue  # descarta o sentinela {"codigoModelo": 0, "descricaoModelo": ""}
+                    continue  
                 linhas_modelo.append((
                     tenant_id, pipeline, offset_pagina,
                     codigo, m.get("codigoModelo"), m.get("descricaoModelo"),
@@ -84,11 +78,52 @@ def salvar_pagina_raw(
             cursor.executemany(
                 """
                 INSERT INTO produto_sances_raw
-                    (tenant_id, pipeline, offset_pagina, codigo, descricao, referencia, referencia_fabrica,
-                     endereco_setor, endereco_rua, endereco_andar, sigla_unidade_medida, descricao_unidade_medida,
-                     codigo_categoria, descricao_categoria, descricao_grupo, descricao_subgrupo,
-                     codigo_ean, codigo_barras, ativo, data_extracao)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (
+                        tenant_id,
+                        pipeline,
+                        offset_pagina,
+                        codigo,
+                        descricao,
+                        referencia,
+                        referencia_fabrica,
+                        endereco_setor,
+                        endereco_rua,
+                        endereco_andar,
+                        sigla_unidade_medida,
+                        descricao_unidade_medida,
+                        codigo_categoria,
+                        descricao_categoria,
+                        descricao_grupo,
+                        descricao_subgrupo,
+                        codigo_ean,
+                        codigo_barras,
+                        ativo,
+                        data_extracao
+                    )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                ON DUPLICATE KEY UPDATE
+                    pipeline = VALUES(pipeline),
+                    offset_pagina = VALUES(offset_pagina),
+                    descricao = VALUES(descricao),
+                    referencia = VALUES(referencia),
+                    referencia_fabrica = VALUES(referencia_fabrica),
+                    endereco_setor = VALUES(endereco_setor),
+                    endereco_rua = VALUES(endereco_rua),
+                    endereco_andar = VALUES(endereco_andar),
+                    sigla_unidade_medida = VALUES(sigla_unidade_medida),
+                    descricao_unidade_medida = VALUES(descricao_unidade_medida),
+                    codigo_categoria = VALUES(codigo_categoria),
+                    descricao_categoria = VALUES(descricao_categoria),
+                    descricao_grupo = VALUES(descricao_grupo),
+                    descricao_subgrupo = VALUES(descricao_subgrupo),
+                    codigo_ean = VALUES(codigo_ean),
+                    codigo_barras = VALUES(codigo_barras),
+                    ativo = VALUES(ativo),
+                    data_extracao = VALUES(data_extracao),
+                    processado_em = NULL
                 """,
                 linhas_produto,
             )
@@ -97,10 +132,51 @@ def salvar_pagina_raw(
             cursor.executemany(
                 """
                 INSERT INTO preco_sances_raw
-                    (tenant_id, pipeline, offset_pagina, codigo_produto, codigo_empresa, cnpj, nome_razao,
-                     nome_fantasia, apelido, custo_medio, venda_varejo, venda_atacado, venda_ecommerce,
-                     garantia, sugerido, reposicao, promocao, personalizado1, personalizado3, data_extracao)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (
+                        tenant_id,
+                        pipeline,
+                        offset_pagina,
+                        codigo_produto,
+                        codigo_empresa,
+                        cnpj,
+                        nome_razao,
+                        nome_fantasia,
+                        apelido,
+                        custo_medio,
+                        venda_varejo,
+                        venda_atacado,
+                        venda_ecommerce,
+                        garantia,
+                        sugerido,
+                        reposicao,
+                        promocao,
+                        personalizado1,
+                        personalizado3,
+                        data_extracao
+                    )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                ON DUPLICATE KEY UPDATE
+                    pipeline = VALUES(pipeline),
+                    offset_pagina = VALUES(offset_pagina),
+                    cnpj = VALUES(cnpj),
+                    nome_razao = VALUES(nome_razao),
+                    nome_fantasia = VALUES(nome_fantasia),
+                    apelido = VALUES(apelido),
+                    custo_medio = VALUES(custo_medio),
+                    venda_varejo = VALUES(venda_varejo),
+                    venda_atacado = VALUES(venda_atacado),
+                    venda_ecommerce = VALUES(venda_ecommerce),
+                    garantia = VALUES(garantia),
+                    sugerido = VALUES(sugerido),
+                    reposicao = VALUES(reposicao),
+                    promocao = VALUES(promocao),
+                    personalizado1 = VALUES(personalizado1),
+                    personalizado3 = VALUES(personalizado3),
+                    data_extracao = VALUES(data_extracao),
+                    processado_em = NULL
                 """,
                 linhas_preco,
             )
@@ -109,10 +185,43 @@ def salvar_pagina_raw(
             cursor.executemany(
                 """
                 INSERT INTO quantidade_sances_raw
-                    (tenant_id, pipeline, offset_pagina, codigo_produto, codigo_empresa, cnpj, nome_razao,
-                     nome_fantasia, apelido, qtd_estoque, qtd_aplicadas, qtd_reservada,
-                     qtd_transito, qtd_pedido, qtd_bo, data_extracao)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (
+                        tenant_id,
+                        pipeline,
+                        offset_pagina,
+                        codigo_produto,
+                        codigo_empresa,
+                        cnpj,
+                        nome_razao,
+                        nome_fantasia,
+                        apelido,
+                        qtd_estoque,
+                        qtd_aplicadas,
+                        qtd_reservada,
+                        qtd_transito,
+                        qtd_pedido,
+                        qtd_bo,
+                        data_extracao
+                    )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                ON DUPLICATE KEY UPDATE
+                    pipeline = VALUES(pipeline),
+                    offset_pagina = VALUES(offset_pagina),
+                    cnpj = VALUES(cnpj),
+                    nome_razao = VALUES(nome_razao),
+                    nome_fantasia = VALUES(nome_fantasia),
+                    apelido = VALUES(apelido),
+                    qtd_estoque = VALUES(qtd_estoque),
+                    qtd_aplicadas = VALUES(qtd_aplicadas),
+                    qtd_reservada = VALUES(qtd_reservada),
+                    qtd_transito = VALUES(qtd_transito),
+                    qtd_pedido = VALUES(qtd_pedido),
+                    qtd_bo = VALUES(qtd_bo),
+                    data_extracao = VALUES(data_extracao),
+                    processado_em = NULL
                 """,
                 linhas_quantidade,
             )
@@ -121,8 +230,24 @@ def salvar_pagina_raw(
             cursor.executemany(
                 """
                 INSERT INTO modelo_veiculo_sances_raw
-                    (tenant_id, pipeline, offset_pagina, codigo_produto, codigo_modelo, descricao_modelo, data_extracao)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (
+                        tenant_id,
+                        pipeline,
+                        offset_pagina,
+                        codigo_produto,
+                        codigo_modelo,
+                        descricao_modelo,
+                        data_extracao
+                    )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s
+                )
+                ON DUPLICATE KEY UPDATE
+                    pipeline = VALUES(pipeline),
+                    offset_pagina = VALUES(offset_pagina),
+                    descricao_modelo = VALUES(descricao_modelo),
+                    data_extracao = VALUES(data_extracao),
+                    processado_em = NULL
                 """,
                 linhas_modelo,
             )

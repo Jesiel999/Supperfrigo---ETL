@@ -3,13 +3,12 @@ from core.pipeline import Pipeline
 from core.step import Step
 
 from bronze.extract.sances.estoque import extrair_estoque_sances, ORIGEM as ORIGEM_ESTOQUE_SANCES
-from repositories.sances.estoque_repository import processar_produtos_pendentes
+from silver.transform.sances.estoque import processar_produtos_pendentes
 from repositories.offset_repository import marcar_inicio_execucao, marcar_concluido, marcar_erro
 from repositories.tenant_repository import buscar_token_por_nome
 from config.settings import URL_SANCES_ESTOQUE
 
 logger = logging.getLogger(__name__)
-
 
 # ── Steps ─────────────────────────────────────────────────────
 

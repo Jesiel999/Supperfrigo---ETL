@@ -1,14 +1,11 @@
-CREATE OR REPLACE
-    ALGORITHM = UNDEFINED
-    DEFINER = `root`@`localhost`
-    SQL SECURITY DEFINER
-VIEW `vw_bi_inadimplencia` AS
+CREATE OR REPLACE VIEW vw_bi_inadimplencia AS
+
 SELECT
     f.codigo_raw AS codigo,
     f.id_empresa AS id_empresa,
     e.nome_empresa AS nome_empresa,
     f.id_pessoa AS id_pessoa,
-    p.nome_pessoa AS nome_pessoa,
+    p.nome AS nome_pessoa,
     f.numero_documento AS numero_documento,
     f.ordem AS ordem,
     f.origem AS origem,
@@ -19,16 +16,36 @@ SELECT
     f.dias_atraso AS dias_atraso,
     f.status_financeiro AS status_financeiro,
     f.descricao_situacao AS descricao_situacao,
+
     (
         SELECT MAX(fb.atualizado_em)
         FROM financeiro_bi fb
     ) AS ultima_atualizacao
+
 FROM financeiro_bi f
-LEFT JOIN empresa_bi e
+
+LEFT JOIN (
+    SELECT
+        codigo_empresa,
+        MAX(nome_empresa) AS nome_empresa
+    FROM empresa_bi
+    GROUP BY codigo_empresa
+) e
     ON e.codigo_empresa = f.id_empresa
-LEFT JOIN pessoa_bi p
-    ON p.codigo_pessoa = f.id_pessoa
+
+LEFT JOIN (
+    SELECT
+        id_sances,
+        MAX(nome) AS nome
+    FROM pessoa_bi
+    GROUP BY id_sances
+) p
+    ON p.id_sances = f.id_pessoa
+
 WHERE
     f.tipo_titulo = 'RECEBER'
     AND f.status_financeiro = 'VENCIDO'
-    AND UPPER(f.descricao_situacao) IN ('EM ABERTO', 'TRÂNSITO');
+    AND UPPER(f.descricao_situacao) IN (
+        'EM ABERTO',
+        'TRÂNSITO'
+    );

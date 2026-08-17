@@ -4,7 +4,7 @@ from core.step import Step
 from database.mysql_connection import connection_mysql
 
 from bronze.extract.sances.financeiro import extrair_financeiro
-from silver.transform.sances.financeiro.financeiro import transformar_financeiro
+from silver.transform.sances.financeiro import transformar_financeiro
 
 from repositories.sances.financeiro_repository import (
     upsert_financeiro_raw,

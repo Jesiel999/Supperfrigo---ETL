@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from api.routers import pipeline_router, financeiro_router, usuarios_router, permissoes_router, empresas_router, menu_router
+from api.routers import pipeline_router, financeiro_router, usuarios_router, permissoes_router, empresas_router, menu_router, estoque_router
 from auth.router import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -33,11 +33,11 @@ app.include_router(auth_router,       prefix="/auth",  tags=["Auth"])
 app.include_router(menu_router.router, prefix="", tags=["Menu"])
 app.include_router(pipeline_router.router,   prefix="/pipeline",  tags=["Pipeline"])
 app.include_router(financeiro_router.router, prefix="/financeiro", tags=["Financeiro"])
+app.include_router(estoque_router.router, prefix="/estoque", tags=["Estoque"])
 app.include_router(usuarios_router.router,  prefix="/usuarios",  tags=["Usuarios"])
 app.include_router(permissoes_router.router, prefix="/permissoes", tags=["Permissoes"])
 app.include_router(empresas_router.router, prefix="/empresas", tags=["Empresas"])
 #app.include_router(chamados_router.router, prefix="/geral", tags=["Chamados"])
-#app.include_router(timezone_router.router, tags=["Timezone"])
 
 @app.get("/")
 def root():
