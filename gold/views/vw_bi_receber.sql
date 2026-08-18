@@ -19,24 +19,19 @@ VIEW `vw_bi_receber` AS
         `f`.`dias_atraso` AS `dias_atraso`,
         `f`.`status_financeiro` AS `status_financeiro`,
         `f`.`descricao_situacao` AS `descricao_situacao`,
-        (SELECT 
-                MAX(`fb`.`atualizado_em`)
-            FROM
-                `financeiro_bi` `fb`) AS `ultima_atualizacao`
+        `ppo`.`ultima_atualizacao` AS `ultima_atualizacao`
     FROM
-        ((`financeiro_bi` `f`
+        (((`financeiro_bi` `f`
+        LEFT JOIN `empresa_bi` `e` ON ((`e`.`codigo_empresa` = `f`.`id_empresa`)))
+        LEFT JOIN `pessoa_bi` `p` ON ((`p`.`id_sances` = `f`.`id_pessoa`)))
         LEFT JOIN (SELECT 
-            `empresa_bi`.`codigo_empresa` AS `codigo_empresa`,
-                MAX(`empresa_bi`.`nome_empresa`) AS `nome_empresa`
+            `pipeline_offset`.`tenant_id` AS `tenant_id`,
+                MAX(`pipeline_offset`.`ultima_execucao`) AS `ultima_atualizacao`
         FROM
-            `empresa_bi`
-        GROUP BY `empresa_bi`.`codigo_empresa`) `e` ON ((`e`.`codigo_empresa` = `f`.`id_empresa`)))
-        LEFT JOIN (SELECT 
-            `pessoa_bi`.`id_sances` AS `id_sances`,
-                MAX(`pessoa_bi`.`nome`) AS `nome`
-        FROM
-            `pessoa_bi`
-        GROUP BY `pessoa_bi`.`id_sances`) `p` ON ((`p`.`id_sances` = `f`.`id_pessoa`)))
+            `pipeline_offset`
+        WHERE
+            (`pipeline_offset`.`origem` LIKE '%financeiro%')
+        GROUP BY `pipeline_offset`.`tenant_id`) `ppo` ON ((`ppo`.`tenant_id` = `f`.`tenant_id`)))
     WHERE
         ((`f`.`tipo_titulo` = 'RECEBER')
             AND (UPPER(`f`.`descricao_situacao`) IN ('EM ABERTO' , 'TRÂNSITO', 'BAIXADO', 'BAIXADO PARCIAL')))

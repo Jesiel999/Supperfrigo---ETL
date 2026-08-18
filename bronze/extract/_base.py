@@ -51,8 +51,6 @@ def _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger
         salvar_offset(tenant_id, origem, offset)
         return None
 
-    # Alguns endpoints (Sults) devolvem uma lista pura no nível raiz.
-    # Aceita os dois formatos.
     if isinstance(corpo, list):
         return corpo
     if isinstance(corpo, dict):
@@ -165,9 +163,6 @@ def extrair_paginado_estoque(
             resetar_offset(tenant_id, origem, valor_padrao=valor_padrao_pagina)
             return {"paginas": paginas, "registros": total_registros, "status": "CONCLUIDO"}
 
-        # Persiste a página ANTES de avançar o offset — se isso falhar, o
-        # offset fica exatamente onde estava, e a próxima execução reprocessa
-        # esta mesma página (não perde nem duplica).
         try:
             on_page(dados, offset, limit)
         except Exception as e:
@@ -198,7 +193,6 @@ def _fetch_um(url, headers, timeout, codigo, tenant_id, origem, logger):
                 raise RateLimitAtingido(f"Rate limit atingido no código {codigo}")
 
             if response.status_code == 404:
-                # Código não existe (cliente nunca cadastrado, ou cancelado/removido) — não é erro, só não há dados.
                 return None
 
             if response.status_code == 200:

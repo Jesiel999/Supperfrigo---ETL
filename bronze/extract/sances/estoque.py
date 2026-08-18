@@ -1,7 +1,7 @@
 from config.settings import SANCES_TOKEN, URL_SANCES_ESTOQUE, REQUEST_TIMEOUT, SLEEP_REQUEST
 from core.logger import get_layer_logger
 from bronze.extract._base import extrair_paginado_estoque
-from repositories.sances.estoque_raw_repository import salvar_pagina_raw
+from repositories.sances.estoque_repository import salvar_pagina_raw
 
 logger = get_layer_logger("bronze", "estoque_sances")
 

@@ -15,9 +15,7 @@ class PipelineRequest(BaseModel):
     data_insercao_inicial: Optional[str] = None
     data_insercao_final:   Optional[str] = None
 
-
 _ultimo_resultado: dict = {}
-
 
 def _run_pipeline(req: PipelineRequest):
     global _ultimo_resultado

@@ -42,7 +42,7 @@ def iniciar_scheduler():
         misfire_grace_time=300,
         coalesce=True,
         replace_existing=True,
-        # next_run_time=datetime.now(),
+        next_run_time=datetime.now(),
         id="etl_financeiro_diario",
     )
 
@@ -55,7 +55,7 @@ def iniciar_scheduler():
         misfire_grace_time=300,
         coalesce=True,
         replace_existing=True,
-        # next_run_time=datetime.now(),
+        next_run_time=datetime.now(),
         id="etl_financeiro_total",
     )
 

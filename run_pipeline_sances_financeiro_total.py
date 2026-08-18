@@ -19,10 +19,9 @@ def executar_sances_total():
         resultado = executar_pipeline_financeiro(
             tenant_id=1,
             codigo_situacao=situacao,
-            offset_file=f"logs/bronze/financeiro_offset_total_{situacao}.txt",
+            origem=f"financeiro_total_{situacao}",
         )
         resultados.append({"codigo_situacao": situacao, "resultado": resultado})
-
     return resultados
 
 if __name__ == "__main__":

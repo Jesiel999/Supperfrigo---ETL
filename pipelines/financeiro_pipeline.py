@@ -5,13 +5,14 @@ from database.mysql_connection import connection_mysql
 
 from bronze.extract.sances.financeiro import extrair_financeiro
 from silver.transform.sances.financeiro import transformar_financeiro
+from config.settings import URL_SANCES_FINANCEIRO
 
 from repositories.sances.financeiro_repository import (
     upsert_financeiro_raw,
     buscar_raw_para_transform,
     upsert_financeiro_bi
 )
-from repositories.tenant_repository import buscar_token_por_nome
+from repositories.offset_repository import marcar_inicio_execucao, marcar_concluido, marcar_erro
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class StepExtrairFinanceiro(Step):
         data_insercao_inicial: str | None = None,
         data_insercao_final: str | None = None,
         codigo_situacao: str | None = None,
-        offset_file: str | None = None
+        origem: str | None = None,
     ):
         super().__init__("ExtrairFinanceiro")
         self.tenant_id          = tenant_id
@@ -40,28 +41,46 @@ class StepExtrairFinanceiro(Step):
         self.data_insercao_inicial = data_insercao_inicial
         self.data_insercao_final = data_insercao_final
         self.codigo_situacao = codigo_situacao
-        self.offset_file = offset_file or f"logs/bronze/financeiro_offset_{self.tenant_id}.txt"
+        self.origem = origem or f"financeiro_{tenant_id}"
 
     def execute(self, context: dict) -> dict:
-        registros = extrair_financeiro(
-            limit=100,
-            data_vencimento_inicial=self.data_vencimento_inicial,
-            data_vencimento_final=self.data_vencimento_final,
-            data_insercao_inicial=self.data_insercao_inicial,
-            data_insercao_final=self.data_insercao_final,
-            codigo_situacao=self.codigo_situacao,
-            offset_file=self.offset_file,
+        marcar_inicio_execucao(
+            tenant_id=self.tenant_id,
+            origem=self.origem,
+            endpoint=URL_SANCES_FINANCEIRO,
         )
 
-        # Injeta tenant_id em cada registro antes de gravar
+        try:
+            extracao = extrair_financeiro(
+                tenant_id=self.tenant_id,
+                origem=self.origem,
+                limit=100,
+                data_vencimento_inicial=self.data_vencimento_inicial,
+                data_vencimento_final=self.data_vencimento_final,
+                data_insercao_inicial=self.data_insercao_inicial,
+                data_insercao_final=self.data_insercao_final,
+                codigo_situacao=self.codigo_situacao,
+            )
+        except Exception as e:
+            marcar_erro(self.tenant_id, self.origem, str(e))
+            raise
+
+        registros = extracao["registros"]
+        status    = extracao["status"]
+
+        if status == "ERRO":
+            marcar_erro(self.tenant_id, self.origem, "Falha na extração — ver logs da execução.")
+        elif status == "CONCLUIDO":
+            marcar_concluido(self.tenant_id, self.origem)
         for r in registros:
             r["tenant_id"] = self.tenant_id
 
         resultado = upsert_financeiro_raw(registros)
         context["bronze_resultado"] = resultado
         context["bronze_total"]     = len(registros)
+        context["bronze_status"]    = status
         context["tenant_id"]        = self.tenant_id
-        logger.info(f"[BRONZE] tenant={self.tenant_id} situacao={self.codigo_situacao} {resultado}")
+        logger.info(f"[BRONZE] tenant={self.tenant_id} situacao={self.codigo_situacao} status={status} {resultado}")
         return context
 
 
@@ -91,14 +110,13 @@ def executar_pipeline_financeiro(
     data_insercao_inicial: str | None = None,
     data_insercao_final: str | None = None,
     codigo_situacao: str | None = None,
-    offset_file: str | None = None,
+    origem: str | None = None,
 ) -> dict:
     """
     Executa o pipeline completo Bronze → Silver → Gold
     para um tenant específico.
 
     O token da API Sances é buscado na tabela tenant_config.
-    
     """
 
     def buscar_token_por_nome(tenant_id: int):
@@ -141,7 +159,7 @@ def executar_pipeline_financeiro(
             data_insercao_inicial=data_insercao_inicial,
             data_insercao_final=data_insercao_final,
             codigo_situacao=codigo_situacao,
-            offset_file=offset_file,
+            origem=origem,
         ))
         .add_step(StepTransformarFinanceiro())
     )

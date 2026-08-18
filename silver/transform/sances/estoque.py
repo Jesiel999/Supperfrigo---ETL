@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from database.mysql_connection import connection_mysql
 
-from repositories.sances.estoque_raw_repository import (
+from repositories.sances.estoque_repository import (
     buscar_produtos_pendentes,
     buscar_precos_do_produto,
     buscar_quantidade_do_produto,
