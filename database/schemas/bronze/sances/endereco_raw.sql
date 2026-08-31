@@ -15,6 +15,6 @@ CREATE TABLE IF NOT EXISTS endereco_sances_raw (
         REFERENCES pessoa_sances_raw(codigo_cliente)
         ON DELETE CASCADE
 );
-
-CREATE INDEX idx_endereco_sances_pessoa
+idx_endereco_sances_pessoa
+CREATE INDEX 
 ON endereco_sances_raw(pessoa_id);

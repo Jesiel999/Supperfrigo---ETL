@@ -4,6 +4,8 @@ from run_pipeline_sances_financeiro import executar_sances_diario
 from run_pipeline_sances_financeiro_total import executar_sances_total
 from run_pipeline_sults import executar_sults
 from run_pipeline_sances_pessoa import executar_sances_pessoa
+from run_pipeline_sances_estoque import executar_sances_estoque
+from run_pipeline_sances_pos_venda import executar_sances_pos_venda
 
 from datetime import datetime
 
@@ -13,20 +15,39 @@ from apscheduler.triggers.combining import OrTrigger
 scheduler = BackgroundScheduler()
 
 def job_sances_financeiro_diario():
-    job_sances_financeiro_diario()
+    executar_sances_diario()
 
 def job_sances_financeiro_total():
-    job_sances_financeiro_total()
+    executar_sances_total()
+
+def job_sances_pos_venda():
+    executar_sances_pos_venda()
 
 def job_sances_pessoa():
     executar_sances_pessoa()
+
+def job_sances_estoque():
+    executar_sances_estoque()
 
 def job_sults():
     executar_sults()
 
 def iniciar_scheduler():
 
-     # DIÁRIO -> 30/30 min, 07h–19h, seg a sáb
+    # POS VENDA -> 30 em 30 minutos
+    trigger_pos_venda = CronTrigger(minute="0,30")
+    scheduler.add_job(
+        job_sances_pos_venda,
+        trigger_pos_venda,
+        max_instances=1,
+        misfire_grace_time=300,
+        next_run_time=datetime.now(),
+        coalesce=True,
+        replace_existing=True,
+        id="etl_sances_pos_venda",
+    )
+
+    # DIÁRIO -> 30/30 min, 07h–19h, seg a sáb
     trigger_diario = OrTrigger([
         CronTrigger(day_of_week="mon-sat", hour="7-18", minute="0,30"),
         CronTrigger(day_of_week="mon-sat", hour="19", minute="0"),
@@ -63,7 +84,7 @@ def iniciar_scheduler():
         misfire_grace_time=300,
         coalesce=True,
         replace_existing=True,
-        next_run_time=datetime.now(),
+        # next_run_time=datetime.now(),
         id="etl_chamados",
     )
 
@@ -77,12 +98,24 @@ def iniciar_scheduler():
         trigger_pessoa,
         max_instances=1,
         misfire_grace_time=300,
-        next_run_time=datetime.now(),
+        # next_run_time=datetime.now(),
         coalesce=True,
         replace_existing=True,
         id="etl_pessoa_sances",
     )
 
+    # ESTOQUE -> 30 em 30 minutos
+    trigger_estoque = CronTrigger(minute="0,30")
+    scheduler.add_job(
+        job_sances_estoque,
+        trigger_estoque,
+        max_instances=1,
+        misfire_grace_time=300,
+        # next_run_time=datetime.now(),
+        coalesce=True,
+        replace_existing=True,
+        id="etl_estoque_sances",
+    )
 
 def parar_scheduler():
     scheduler.shutdown(wait=False)
