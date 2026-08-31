@@ -1,4 +1,4 @@
-CREATE TABLE `produto_sances_raw` (
+CREATE TABLE IF NOT EXISTS `produto_sances_raw` (
   `id` int NOT NULL AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `pipeline` varchar(50) COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'estoque_sances',

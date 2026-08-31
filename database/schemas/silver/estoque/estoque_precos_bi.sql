@@ -1,4 +1,4 @@
-CREATE TABLE `estoque_precos_bi` (
+CREATE TABLE IF NOT EXISTS `estoque_precos_bi` (
   `id` int NOT NULL AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo_produto` int NOT NULL,
