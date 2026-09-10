@@ -12,7 +12,7 @@ def upsert_chamados_apoio_raw(registros: list[dict]) -> dict:
     """
 
     if not registros:
-        logger.warning("upsert_chamados_apoio_raw chamado com lista vazia.")
+        # logger.warning("upsert_chamados_apoio_raw chamado com lista vazia.")
         return {"inseridos": 0, "atualizados": 0, "erros": 0}
 
     conn = connection_mysql()
@@ -67,14 +67,14 @@ def upsert_chamados_apoio_raw(registros: list[dict]) -> dict:
                 conn.rollback()
                 erros += 1
 
-                logger.error(
-                    f"Erro upsert apoio chamado={item.get('chamado_codigo')} "
-                    f"pessoa={item.get('pessoa_id')}: {e}"
-                )
+                # logger.error(
+                #    f"Erro upsert apoio chamado={item.get('chamado_codigo')} "
+                #    f"pessoa={item.get('pessoa_id')}: {e}"
+                #)
 
             if i % BATCH_COMMIT == 0:
                 conn.commit()
-                logger.info(f"Commit parcial apoio_raw: {i} registros processados")
+                # logger.info(f"Commit parcial apoio_raw: {i} registros processados")
 
         conn.commit()
 
@@ -82,12 +82,12 @@ def upsert_chamados_apoio_raw(registros: list[dict]) -> dict:
         cursor.close()
         conn.close()
 
-    logger.info(
-        f"chamados_apoio_raw | "
-        f"INSERT={inseridos} "
-        f"UPDATE={atualizados} "
-        f"ERRO={erros}"
-    )
+    # logger.info(
+    #    f"chamados_apoio_raw | "
+    #    f"INSERT={inseridos} "
+    #    f"UPDATE={atualizados} "
+    #    f"ERRO={erros}"
+    #)
 
     return {
         "inseridos": inseridos,
@@ -97,7 +97,7 @@ def upsert_chamados_apoio_raw(registros: list[dict]) -> dict:
 
 def upsert_chamados_apoio_bi(registros: list[dict]) -> dict:
     if not registros:
-        logger.warning("upsert_chamados_apoio_bi chamado com lista vazia.")
+        # logger.warning("upsert_chamados_apoio_bi chamado com lista vazia.")
         return {"inseridos": 0, "atualizados": 0, "erros": 0}
 
     conn = connection_mysql()
@@ -172,9 +172,9 @@ def upsert_chamados_apoio_bi(registros: list[dict]) -> dict:
         cursor.close()
         conn.close()
 
-    logger.info(
-        f"chamados_apoio_bi | INSERT={inseridos} UPDATE={atualizados} ERRO={erros}"
-    )
+    # logger.info(
+    #    f"chamados_apoio_bi | INSERT={inseridos} UPDATE={atualizados} ERRO={erros}"
+    #)
 
     return {
         "inseridos": inseridos,
@@ -188,7 +188,7 @@ def upsert_chamados_apoio_bi(registros: list[dict]) -> dict:
     """
 
     if not registros:
-        logger.warning("upsert_chamados_apoio_bi chamado com lista vazia.")
+        # logger.warning("upsert_chamados_apoio_bi chamado com lista vazia.")
         return {"inseridos": 0, "atualizados": 0, "erros": 0}
 
     conn = connection_mysql()
@@ -242,7 +242,7 @@ def upsert_chamados_apoio_bi(registros: list[dict]) -> dict:
 
             if i % BATCH_COMMIT == 0:
                 conn.commit()
-                logger.info(f"Commit parcial apoio_bi: {i} registros processados")
+                # logger.info(f"Commit parcial apoio_bi: {i} registros processados")
 
         conn.commit()
 

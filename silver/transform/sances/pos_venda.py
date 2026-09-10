@@ -1,11 +1,6 @@
 from datetime import date, datetime
 from core.logger import get_layer_logger
-from repositories.sances.pos_venda_repository import (
-    buscar_pos_venda_pendentes,
-    buscar_filhos,
-    marcar_processado,
-    upsert_pos_venda_bi,
-)
+from repositories.sances.pos_venda_repository import buscar_pos_venda_pendentes, buscar_filhos, marcar_processado, upsert_pos_venda_bi
 
 logger = get_layer_logger("silver", "pos_venda_transform")
 
@@ -134,5 +129,5 @@ def processar_pos_venda_pendentes(tenant_id: int, limite: int = 500) -> dict:
         ids_processados.append(raw["id"])
 
     marcar_processado(ids_processados)
-    logger.info(f"[SILVER pos_venda] tenant={tenant_id} | {len(ids_processados)} pós-vendas processados.")
+    # logger.info(f"[SILVER pos_venda] tenant={tenant_id} | {len(ids_processados)} pós-vendas processados.")
     return {"processados": len(ids_processados)}

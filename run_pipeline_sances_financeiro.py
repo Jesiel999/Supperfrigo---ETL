@@ -1,3 +1,4 @@
+# run_pipeline_sances_financeiro.py — DIÁRIO (07h–19h)
 from datetime import datetime
 import calendar
 
@@ -30,7 +31,10 @@ def executar_sances_diario():
     )
 
     resultados = []
+    primeiro_dia = hoje.replace(day=1)
+    ultimo_dia = hoje.replace(day=calendar.monthrange(hoje.year, hoje.month)[1])
 
+    resultados = []
     for modo in MODOS_DIARIO:
 
         if modo == "baixa":
@@ -44,6 +48,15 @@ def executar_sances_diario():
                 "data_insercao_inicial": primeiro_dia,
                 "data_insercao_final": ultimo_dia,
             }
+            kwargs = dict(
+                data_vencimento_inicial=primeiro_dia.strftime("%Y-%m-%d"),
+                data_vencimento_final=ultimo_dia.strftime("%Y-%m-%d"),
+            )
+        else:
+            kwargs = dict(
+                data_insercao_inicial=primeiro_dia.strftime("%Y-%m-%d"),
+                data_insercao_final=ultimo_dia.strftime("%Y-%m-%d"),
+            )
 
         resultado = executar_pipeline_financeiro(
             tenant_id=1,

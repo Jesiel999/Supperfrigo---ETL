@@ -4,27 +4,20 @@ import logging
 
 from requests.exceptions import ConnectionError, Timeout, RequestException
 from datetime import datetime
-
-from config.settings import (
-    SANCES_TOKEN,
-    URL_SANCES_FINANCEIRO,
-    REQUEST_TIMEOUT,
-    RATE_LIMIT_SLEEP,
-    SLEEP_REQUEST,
-)
+from repositories.sances.financeiro_repository import salvar_pagina_raw
+from bronze.extract._base import extrair_paginado_sem_filtro
+from config.settings import SANCES_TOKEN, URL_SANCES_FINANCEIRO, REQUEST_TIMEOUT, RATE_LIMIT_SLEEP, SLEEP_REQUEST
 from core.logger import get_layer_logger
 from repositories.offset_repository import ler_offset, salvar_offset, resetar_offset
 
 class RateLimitAtingido(Exception):
     """Exceção utilizada para encerrar a extração quando atingir rate limit."""
     pass
-    
+
 logger = get_layer_logger("bronze", "financeiro")
 
-HEADERS = {"Authorization": f"Bearer {'SANCES_TOKEN'}"}
-
 # ==========================================
-# CAMPOS PERMITIDOS
+# CAMPOS PERMITIDOS (título)
 # ==========================================
 CAMPOS_PERMITIDOS = [
     "codigo", "tipo_titulo",
@@ -69,6 +62,7 @@ CAMPOS_DATA = [
     "data_emissao", "data_competencia", "data_vencimento",
     "data_insercao", "data_alteracao",
     "data_cancelamento", "data_baixa", "data_aprovacao",
+    "data_pagamento",
 ]
 
 # ==========================================
@@ -112,10 +106,11 @@ def _converter_data(data_str) -> str | None:
         return None
 
 def _filtrar_item(item: dict) -> dict:
-    """Converte datas e filtra apenas campos permitidos."""
+    """Converte datas e filtra apenas campos permitidos do TÍTULO (não inclui recebimentos)."""
     for campo in CAMPOS_DATA:
         if campo in item and item[campo]:
             item[campo] = _converter_data(item[campo])
+
     return {k: v for k, v in item.items() if k in CAMPOS_PERMITIDOS}
 
 def _fetch_page(
@@ -187,6 +182,51 @@ def _fetch_page(
         logger.error(f"[{origem}] Erro ao parsear JSON da página {offset}: {e}")
         salvar_offset(tenant_id, origem, offset)
         return None
+
+def _extrair_recebimentos(item: dict, codigo_titulo, tenant_id: int) -> list[dict]:
+    """
+    Extrai o array 'recebimentos' do título antes da filtragem principal
+    (senão seria descartado, já que não está em CAMPOS_PERMITIDOS).
+
+    Diferente de arrays aninhados de outras pipelines (pós-venda), aqui
+    cada recebimento já vem com 'codigo' próprio e estável — dá pra fazer
+    upsert direto por essa chave, sem precisar de delete+insert.
+    """
+    recebimentos = item.get("recebimentos") or []
+    
+    linhas = []
+
+    data_alteracao_titulo = _converter_data(
+        item.get("data_alteracao")
+    )
+
+    for r in recebimentos:
+        codigo = r.get("codigo")
+        if not codigo:
+            continue
+        linhas.append({
+            "tenant_id": tenant_id,
+            "id": codigo,
+            "codigo_titulo": codigo_titulo,
+            "codigo_tipo_movimentacao": r.get("codigo_tipo_movimentacao"),
+            "descricao_tipo_movimentacao": r.get("descricao_tipo_movimentacao"),
+            "valor_pago": r.get("valor_pago"),
+            "valor_nominal": r.get("valor_nominal"),
+            "data_movimentacao": _converter_data(r.get("data_movimentacao")),
+            "data_alteracao": data_alteracao_titulo,
+            "codigo_conta": r.get("codigo_conta"),
+            "descricao_conta": r.get("descricao_conta"),
+            "historico": r.get("historico"),
+            "data_conciliacao": _converter_data(r.get("data_conciliacao")),
+            "codigo_caixa": r.get("codigo_caixa"),
+            "codigo_cheque_terceiro": r.get("codigo_cheque_terceiro"),
+            "codigo_pagamento_cartao": r.get("codigo_pagamento_cartao"),
+            "desconto": r.get("desconto"),
+            "acrescimo": r.get("acrescimo"),
+            "juros": r.get("juros"),
+            "multa": r.get("multa"),
+        })
+    return linhas
 
 
 # ==========================================
@@ -271,9 +311,34 @@ def extrair_financeiro(
         logger.info(f"[{origem}] Página {offset} (situacao={codigo_situacao}): {len(dados)} registros recebidos.")
 
         for item in dados:
+def extrair_financeiro_sances(
+    tenant_id: int,
+    origem: str,
+    token: str | None = None,
+    limit: int = 100,
+    offset_inicial: int | None = None,
+    filtros: dict | None = None,
+) -> dict:
+    headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
+    extra_params = filtros or {}
+
+    def _persistir_pagina(itens: list[dict], offset: int, limit_usado: int) -> None:
+        titulos_filtrados = []
+        recebimentos_para_salvar = []
+
+        for item in itens:
+            codigo_titulo = item.get("codigo")
+            if not codigo_titulo:
+                continue
+
+            # extrai recebimentos ANTES da filtragem (senão _filtrar_item descarta)
+            recebimentos_para_salvar.extend(
+                _extrair_recebimentos(item, codigo_titulo, tenant_id)
+            )
+
             filtrado = _filtrar_item(item)
-            if filtrado.get("codigo"):
-                todos_registros.append(filtrado)
+            filtrado["tenant_id"] = tenant_id
+            titulos_filtrados.append(filtrado)
 
         salvar_offset(tenant_id, origem, offset)
         time.sleep(SLEEP_REQUEST)
@@ -284,3 +349,22 @@ def extrair_financeiro(
         f"registros={len(todos_registros)} | status={status}"
     )
     return {"registros": todos_registros, "status": status}
+        salvar_pagina_raw(
+            tenant_id=tenant_id,
+            itens=titulos_filtrados,
+            recebimentos=recebimentos_para_salvar,
+        )
+
+    return extrair_paginado_sem_filtro(
+        url=URL_SANCES_FINANCEIRO,
+        headers=headers,
+        origem=origem,
+        tenant_id=tenant_id,
+        on_page=_persistir_pagina,
+        logger=logger,
+        limit=limit,
+        offset_inicial=offset_inicial,
+        extra_params=extra_params,
+        timeout=REQUEST_TIMEOUT,
+        sleep_request=SLEEP_REQUEST,
+    )

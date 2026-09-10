@@ -18,6 +18,7 @@ def executar_sances_total():
     for situacao in SITUACOES:
         resultado = executar_pipeline_financeiro(
             tenant_id=1,
+            origem=f"financeiro_total_{situacao}",
             codigo_situacao=situacao,
             origem=f"financeiro_total_{situacao}",
         )

@@ -36,7 +36,7 @@ def upsert_pessoa_sances_raw(registros: list[dict]) -> dict:
     cursor.close()
     conn.close()
 
-    logger.info(f"[pessoa_sances_raw] {len(registros)} registros processados.")
+    # logger.info(f"[pessoa_sances_raw] {len(registros)} registros processados.")
     return {"processados": len(registros), "afetados": afetados}
 
 
@@ -81,7 +81,7 @@ def upsert_pessoa_sults_raw(registros: list[dict]) -> dict:
     cursor.close()
     conn.close()
 
-    logger.info(f"[pessoa_sults_raw] {len(registros)} registros processados.")
+    # logger.info(f"[pessoa_sults_raw] {len(registros)} registros processados.")
     return {"processados": len(registros), "afetados": afetados}
 
 
@@ -192,10 +192,10 @@ def upsert_pessoa_sances_completo(registros: list[dict]) -> dict:
         upsert_email_sances_raw(pessoa_id, r.get("email"))
         upsert_telefone_sances_raw(pessoa_id, r.get("telefone"))
 
-    logger.info(
-        f"[pessoa_sances_completo] {len(registros)} pessoas processadas "
-        f"(endereco/email/telefone distribuídos nas respectivas tabelas)."
-    )
+    # logger.info(
+    #    f"[pessoa_sances_completo] {len(registros)} pessoas processadas "
+    #    f"(endereco/email/telefone distribuídos nas respectivas tabelas)."
+    #)
     return resultado_pessoa
 
 
@@ -334,10 +334,10 @@ def upsert_pessoa_sults_completo(registros: list[dict]) -> dict:
         upsert_empresa_sults_raw(pessoa_id, r.get("empresa"))
         upsert_campo_adicional_sults_raw(pessoa_id, r.get("campoAdicional"))
 
-    logger.info(
-        f"[pessoa_sults_completo] {len(registros)} pessoas processadas "
-        f"(endereco/empresa/campoAdicional distribuídos nas respectivas tabelas)."
-    )
+    # logger.info(
+    #    f"[pessoa_sults_completo] {len(registros)} pessoas processadas "
+    #    f"(endereco/empresa/campoAdicional distribuídos nas respectivas tabelas)."
+    #)
     return resultado_pessoa
 
 
@@ -406,5 +406,5 @@ def upsert_pessoa_bi(registros: list[dict]) -> dict:
     cursor.close()
     conn.close()
 
-    logger.info(f"[pessoa_bi] {len(registros)} registros processados.")
+    # logger.info(f"[pessoa_bi] {len(registros)} registros processados.")
     return {"processados": len(registros), "afetados": afetados}

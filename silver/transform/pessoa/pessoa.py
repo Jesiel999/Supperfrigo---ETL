@@ -31,8 +31,8 @@ def transformar_pessoa(raw: dict, tenant_id: int) -> list[dict]:
         registro["sexo"] = registro.get("sexo") or (p.get("sexo") or "")[:1] or None
 
     resultado = list(por_cpf.values())
-    logger.info(
-        f"[SILVER pessoa] tenant={tenant_id} | sances={len(sances)} "
-        f"sults={len(sults)} unificados={len(resultado)}"
-    )
+    # logger.info(
+    #    f"[SILVER pessoa] tenant={tenant_id} | sances={len(sances)} "
+    #    f"sults={len(sults)} unificados={len(resultado)}"
+    #)
     return resultado

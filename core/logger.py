@@ -14,8 +14,8 @@ def get_layer_logger(layer: str, name: str) -> logging.Logger:
     log_path = os.path.join(log_dir, f"{name}.log")
 
     logger = logging.getLogger(f"{layer}.{name}")
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
+    # logger.setLevel(logging.INFO)
+    # logger.propagate = False
 
     if len(logger.handlers) == 0:
         fh = ConcurrentRotatingFileHandler(
@@ -28,6 +28,6 @@ def get_layer_logger(layer: str, name: str) -> logging.Logger:
             datefmt="%Y-%m-%d %H:%M:%S"
         )
         fh.setFormatter(formatter)
-        logger.addHandler(fh)
+        # logger.addHandler(fh)
 
     return logger

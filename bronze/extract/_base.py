@@ -18,7 +18,7 @@ def _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger
     while True:
         try:
             response = requests.get(url, headers=headers, params=params, timeout=timeout)
-            logger.info(f"[{origem}] GET {response.url} -> {response.status_code}")
+            # logger.info(f"[{origem}] GET {response.url} -> {response.status_code}")
 
             if response.status_code == 429:
                 logger.warning(f"[{origem}] Rate limit atingido na página {offset}. Salvando offset.")
@@ -56,7 +56,7 @@ def _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger
     if isinstance(corpo, dict):
         return corpo.get("dados", [])
 
-    logger.error(f"[{origem}] Formato de resposta inesperado na página {offset}: {type(corpo)}")
+    # logger.error(f"[{origem}] Formato de resposta inesperado na página {offset}: {type(corpo)}")
     salvar_offset(tenant_id, origem, offset)
     return None
 
@@ -91,23 +91,23 @@ def extrair_paginado(
         try:
             dados = _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger)
         except RateLimitAtingido:
-            logger.warning(
-                f"[{origem}] Extração interrompida por rate limit. "
-                f"Retornando {len(todos_registros)} registros já coletados."
-            )
+            #logger.warning(
+            #    f"[{origem}] Extração interrompida por rate limit. "
+            #    f"Retornando {len(todos_registros)} registros já coletados."
+            #)
             break
 
         if dados is None:
-            logger.warning(f"[{origem}] Extração encerrada com falha. Offset salvo para retomada.")
+            # logger.warning(f"[{origem}] Extração encerrada com falha. Offset salvo para retomada.")
             break
 
         # Lista vazia = fim dos dados.
         if not dados:
-            logger.info(f"[{origem}] Página {offset} vazia — fim dos registros. Total: {len(todos_registros)}")
+            # # logger.info(f"[{origem}] Página {offset} vazia — fim dos registros. Total: {len(todos_registros)}")
             resetar_offset(tenant_id, origem, valor_padrao=valor_padrao_pagina)
             break
 
-        logger.info(f"[{origem}] Página {offset}: {len(dados)} registros recebidos.")
+        # logger.info(f"[{origem}] Página {offset}: {len(dados)} registros recebidos.")
 
         for item in dados:
             filtrado = {campo: item.get(campo) for campo in campos_permitidos}
@@ -119,10 +119,11 @@ def extrair_paginado(
         time.sleep(sleep_request)
         offset += 1
 
-    logger.info(f"[{origem}] Extração finalizada | tenant={tenant_id} | registros={len(todos_registros)}")
+    # logger.info(f"[{origem}] Extração finalizada | tenant={tenant_id} | registros={len(todos_registros)}")
     return todos_registros
 
 def extrair_paginado_estoque(
+def extrair_paginado_sem_filtro(
     url: str,
     headers: dict,
     origem: str,
@@ -153,6 +154,11 @@ def extrair_paginado_estoque(
 
         if dados is None:
             logger.warning(f"[{origem}] Extração encerrada com falha na página {offset}. Offset NÃO avançado.")
+            #logger.warning(f"[{origem}] Extração interrompida por rate limit na página {offset}.")
+            return {"paginas": paginas, "registros": total_registros, "status": "RATE_LIMIT"}
+
+        if dados is None:
+            # logger.warning(f"[{origem}] Extração encerrada com falha na página {offset}. Offset NÃO avançado.")
             return {"paginas": paginas, "registros": total_registros, "status": "ERRO"}
 
         qtd = len(dados)
@@ -160,6 +166,7 @@ def extrair_paginado_estoque(
         # Fim da paginação: página sem registros.
         if qtd == 0:
             logger.info(f"[{origem}] Página {offset} vazia — fim dos registros. Total: {total_registros}")
+            # logger.info(f"[{origem}] Página {offset} vazia — fim dos registros. Total: {total_registros}")
             resetar_offset(tenant_id, origem, valor_padrao=valor_padrao_pagina)
             return {"paginas": paginas, "registros": total_registros, "status": "CONCLUIDO"}
 
@@ -170,6 +177,7 @@ def extrair_paginado_estoque(
             return {"paginas": paginas, "registros": total_registros, "status": "ERRO"}
 
         logger.info(f"[{origem}] Página {offset}: {qtd} registros persistidos na Bronze.")
+        # logger.info(f"[{origem}] Página {offset}: {qtd} registros persistidos na Bronze.")
         paginas += 1
         total_registros += qtd
 
@@ -185,7 +193,7 @@ def _fetch_um(url, headers, timeout, codigo, tenant_id, origem, logger):
     while True:
         try:
             response = requests.get(url, headers=headers, timeout=timeout)
-            logger.info(f"[{origem}] GET {response.url} -> {response.status_code}")
+            # logger.info(f"[{origem}] GET {response.url} -> {response.status_code}")
 
             if response.status_code == 429:
                 logger.warning(f"[{origem}] Rate limit atingido no código {codigo}. Salvando offset.")
@@ -220,7 +228,7 @@ def _fetch_um(url, headers, timeout, codigo, tenant_id, origem, logger):
         return None
 
     if not corpo.get("sucesso", True):
-        logger.info(f"[{origem}] Código {codigo}: sucesso=false ({corpo.get('mensagemUsuarioFinal')}).")
+        # logger.info(f"[{origem}] Código {codigo}: sucesso=false ({corpo.get('mensagemUsuarioFinal')}).")
         return None
 
     return corpo.get("dados")
@@ -238,44 +246,76 @@ def extrair_por_codigo(
     timeout: int = 30,
     sleep_request: float = 1.0,
     max_nao_encontrados_seguidos: int = 5000,
+    on_registro = None,
 ) -> list[dict]:
+
     codigo = ler_offset(tenant_id, origem, offset_inicial)
+
     todos_registros: list[dict] = []
     nao_encontrados_seguidos = 0
 
     for _ in range(quantidade_por_execucao):
+
         url = f"{url_base}?codigo_cliente={codigo}"
 
         try:
-            item = _fetch_um(url, headers, timeout, codigo, tenant_id, origem, logger)
-        except RateLimitAtingido:
-            logger.warning(
-                f"[{origem}] Extração interrompida por rate limit no código {codigo}. "
-                f"{len(todos_registros)} registros coletados nesta execução."
+            item = _fetch_um(
+                url, 
+                headers, 
+                timeout, 
+                codigo, 
+                tenant_id, 
+                origem, 
+                logger
             )
+
+        except RateLimitAtingido:
+
+            #logger.warning(
+            #    f"[{origem}] Extração interrompida por rate limit no código {codigo}. "
+            #    f"{len(todos_registros)} registros coletados nesta execução."
+            #)
+
             break
 
         if item is None:
+
             nao_encontrados_seguidos += 1
+
             if nao_encontrados_seguidos >= max_nao_encontrados_seguidos:
-                logger.info(
-                    f"[{origem}] {max_nao_encontrados_seguidos} códigos seguidos sem retorno "
-                    f"(parou em {codigo}) — encerrando varredura desta execução."
-                )
+                
                 codigo += 1
-                salvar_offset(tenant_id, origem, codigo)
+                
+                salvar_offset(
+                    tenant_id, 
+                    origem, 
+                    codigo
+                )
+                
                 break
         else:
+
             nao_encontrados_seguidos = 0
+
             filtrado = {campo: item.get(campo) for campo in campos_permitidos}
+            
             todos_registros.append(filtrado)
 
+            if on_registro:
+                on_registro(filtrado)
+                
         codigo += 1
-        salvar_offset(tenant_id, origem, codigo)
+
+        salvar_offset(
+            tenant_id, 
+            origem, 
+            codigo
+        )
+
         time.sleep(sleep_request)
 
-    logger.info(
-        f"[{origem}] Extração finalizada | tenant={tenant_id} | "
-        f"registros={len(todos_registros)} | próximo código={codigo}"
-    )
+    # logger.info(
+    #    f"[{origem}] Extração finalizada | tenant={tenant_id} | "
+    #    f"registros={len(todos_registros)} | próximo código={codigo}"
+    #)
     return todos_registros

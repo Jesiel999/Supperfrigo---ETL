@@ -28,11 +28,11 @@ def calcular_kpi_inadimplencia() -> dict:
         """)
         resultado = cursor.fetchone()
 
-        logger.info(f"KPI Inadimplência calculado: {resultado}")
+        # logger.info(f"KPI Inadimplência calculado: {resultado}")
         return resultado or {}
 
     except Exception as e:
-        logger.error(f"Erro ao calcular KPI inadimplência: {e}")
+        # logger.error(f"Erro ao calcular KPI inadimplência: {e}")
         return {}
 
     finally:
