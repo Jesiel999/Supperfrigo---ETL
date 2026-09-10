@@ -22,10 +22,10 @@ def transformar_empresa(registros_raw: list[dict]) -> list[dict]:
                 }
 
         except Exception as e:
-            logger.error(f"Erro ao transformar empresa {raw.get('codigo')}: {e}")
+            # logger.error(f"Erro ao transformar empresa {raw.get('codigo')}: {e}")
 
     resultado = list(empresas_map.values())
 
-    logger.info(f"Silver empresa: {len(resultado)} registros únicos.")
+    # logger.info(f"Silver empresa: {len(resultado)} registros únicos.")
     return resultado
    

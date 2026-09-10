@@ -13,7 +13,7 @@ def ler_offset(tenant_id: int, origem: str, offset_inicial: int | None = None, v
       2. Offset salvo no banco 
     """
     if offset_inicial is not None:
-        logger.info(f"[{origem}] tenant={tenant_id} | Offset forçado por parâmetro: {offset_inicial}")
+        # logger.info(f"[{origem}] tenant={tenant_id} | Offset forçado por parâmetro: {offset_inicial}")
         return offset_inicial
 
     conn = connection_mysql()
@@ -27,10 +27,10 @@ def ler_offset(tenant_id: int, origem: str, offset_inicial: int | None = None, v
     conn.close()
 
     if row:
-        logger.info(f"[{origem}] tenant={tenant_id} | Offset recuperado do banco: {row['offset_atual']}")
+        # logger.info(f"[{origem}] tenant={tenant_id} | Offset recuperado do banco: {row['offset_atual']}")
         return row["offset_atual"]
 
-    logger.info(f"[{origem}] tenant={tenant_id} | Nenhum offset salvo. Iniciando do offset {valor_padrao}.")
+    # logger.info(f"[{origem}] tenant={tenant_id} | Nenhum offset salvo. Iniciando do offset {valor_padrao}.")
     return valor_padrao
 
 
@@ -58,6 +58,7 @@ def resetar_offset(tenant_id: int, origem: str, valor_padrao: int = 1) -> None:
     """
     salvar_offset(tenant_id, origem, valor_padrao)
     logger.info(f"[{origem}] tenant={tenant_id} | Offset resetado para {valor_padrao}.")
+    # logger.info(f"[{origem}] tenant={tenant_id} | Offset resetado para {valor_padrao}.")
 
 def marcar_inicio_execucao(tenant_id: int, origem: str, endpoint: str) -> None:
     """Chamar no início de cada execução da pipeline, antes de qualquer request."""
@@ -120,6 +121,7 @@ def marcar_concluido(tenant_id: int, origem: str, valor_padrao_offset: int = 1) 
     cursor.close()
     conn.close()
     logger.info(f"[{origem}] tenant={tenant_id} | status=CONCLUIDO, offset resetado para {valor_padrao_offset}.")
+    # logger.info(f"[{origem}] tenant={tenant_id} | status=CONCLUIDO, offset resetado para {valor_padrao_offset}.")
 
 
 def marcar_erro(tenant_id: int, origem: str, erro: str) -> None:
@@ -142,3 +144,4 @@ def marcar_erro(tenant_id: int, origem: str, erro: str) -> None:
     cursor.close()
     conn.close()
     logger.error(f"[{origem}] tenant={tenant_id} | status=ERRO | offset NÃO avançado | {erro}")
+    # logger.error(f"[{origem}] tenant={tenant_id} | status=ERRO | offset NÃO avançado | {erro}")

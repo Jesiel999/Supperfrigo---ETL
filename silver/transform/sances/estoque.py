@@ -169,6 +169,7 @@ def processar_produtos_pendentes(
     de lógica extra de "qual child pertence a qual execução".
     """
     pendentes = buscar_produtos_pendentes(tenant_id, pipeline, limite)
+    pendentes = buscar_produtos_pendentes(tenant_id, limite)
     if not pendentes:
         return {"processados": 0}
 
@@ -197,4 +198,5 @@ def processar_produtos_pendentes(
     marcar_processado("produto_sances_raw", ids_processados)
 
     logger.info(f"[SILVER estoque] tenant={tenant_id} | {len(ids_processados)} produtos processados.")
+    # logger.info(f"[SILVER estoque] tenant={tenant_id} | {len(ids_processados)} produtos processados.")
     return {"processados": len(ids_processados)}

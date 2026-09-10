@@ -1,6 +1,6 @@
 from config.settings import SANCES_TOKEN, URL_SANCES_ESTOQUE, REQUEST_TIMEOUT, SLEEP_REQUEST
 from core.logger import get_layer_logger
-from bronze.extract._base import extrair_paginado_estoque
+from bronze.extract._base import extrair_paginado_sem_filtro
 from repositories.sances.estoque_repository import salvar_pagina_raw
 
 logger = get_layer_logger("bronze", "estoque_sances")
@@ -9,7 +9,6 @@ ORIGEM = "estoque_sances"
 
 FILTROS_DEFAULT = {"ativo": 1}
 
-
 def extrair_estoque_sances(
     tenant_id: int,
     token: str | None = None,
@@ -17,18 +16,17 @@ def extrair_estoque_sances(
     offset_inicial: int | None = None,
     filtros: dict | None = None,
 ) -> dict:
-    headers = {"Authorization": f"Bearer {'token' or 'SANCES_TOKEN'}"}
+    headers = {"Authorization": f"Bearer {token or 'SANCES_TOKEN'}"}
     extra_params = {**FILTROS_DEFAULT, **(filtros or {})}
 
     def _persistir_pagina(itens: list[dict], offset: int, limit_usado: int) -> None:
         salvar_pagina_raw(
             tenant_id=tenant_id,
-            pipeline=ORIGEM,
             offset_pagina=offset,
             itens=itens,
         )
 
-    return extrair_paginado_estoque(
+    return extrair_paginado_sem_filtro(
         url=URL_SANCES_ESTOQUE,
         headers=headers,
         origem=ORIGEM,

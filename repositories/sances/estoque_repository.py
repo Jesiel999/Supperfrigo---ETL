@@ -35,6 +35,7 @@ def salvar_pagina_raw(
 
             linhas_produto.append((
                 tenant_id, pipeline, offset_pagina,
+                tenant_id, offset_pagina,
                 codigo, item.get("descricao"), item.get("referencia"), ref_fabrica_str,
                 item.get("endereco_setor"), item.get("endereco_rua"), item.get("endereco_andar"),
                 item.get("siglaUnidadeMedida"), item.get("descricaoUnidadeMedida"),
@@ -47,6 +48,7 @@ def salvar_pagina_raw(
             for p in (item.get("precos") or []):
                 linhas_preco.append((
                     tenant_id, pipeline, offset_pagina,
+                    tenant_id, offset_pagina,
                     codigo, p.get("codigoEmpresa"), p.get("cnpj"), p.get("nomeRazao"),
                     p.get("nomeFantasia"), p.get("apelido"),
                     p.get("custoMedio"), p.get("vendaVarejo"), p.get("vendaAtacado"), p.get("vendaEcommerce"),
@@ -58,6 +60,7 @@ def salvar_pagina_raw(
             for e in (item.get("estoque") or []):
                 linhas_quantidade.append((
                     tenant_id, pipeline, offset_pagina,
+                    tenant_id, offset_pagina,
                     codigo, e.get("codigoEmpresa"), e.get("cnpj"), e.get("nomeRazao"),
                     e.get("nomeFantasia"), e.get("apelido"),
                     e.get("qtdEstoque"), e.get("qtdAplicadas"), e.get("qtdReservada"),
@@ -70,6 +73,7 @@ def salvar_pagina_raw(
                     continue  
                 linhas_modelo.append((
                     tenant_id, pipeline, offset_pagina,
+                    tenant_id, offset_pagina,
                     codigo, m.get("codigoModelo"), m.get("descricaoModelo"),
                     agora,
                 ))
@@ -106,6 +110,10 @@ def salvar_pagina_raw(
                 )
                 ON DUPLICATE KEY UPDATE
                     pipeline = VALUES(pipeline),
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                ON DUPLICATE KEY UPDATE
                     offset_pagina = VALUES(offset_pagina),
                     descricao = VALUES(descricao),
                     referencia = VALUES(referencia),
@@ -160,6 +168,10 @@ def salvar_pagina_raw(
                 )
                 ON DUPLICATE KEY UPDATE
                     pipeline = VALUES(pipeline),
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                ON DUPLICATE KEY UPDATE
                     offset_pagina = VALUES(offset_pagina),
                     cnpj = VALUES(cnpj),
                     nome_razao = VALUES(nome_razao),
@@ -209,6 +221,10 @@ def salvar_pagina_raw(
                 )
                 ON DUPLICATE KEY UPDATE
                     pipeline = VALUES(pipeline),
+                    %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                ON DUPLICATE KEY UPDATE
                     offset_pagina = VALUES(offset_pagina),
                     cnpj = VALUES(cnpj),
                     nome_razao = VALUES(nome_razao),
@@ -244,6 +260,9 @@ def salvar_pagina_raw(
                 )
                 ON DUPLICATE KEY UPDATE
                     pipeline = VALUES(pipeline),
+                    %s, %s, %s, %s, %s, %s
+                )
+                ON DUPLICATE KEY UPDATE
                     offset_pagina = VALUES(offset_pagina),
                     descricao_modelo = VALUES(descricao_modelo),
                     data_extracao = VALUES(data_extracao),
@@ -264,17 +283,18 @@ def salvar_pagina_raw(
 
 # ── Leitura para a Silver ────────────────────────────────────
 
-def buscar_produtos_pendentes(tenant_id: int, pipeline: str, limite: int = 500) -> list[dict]:
+
+def buscar_produtos_pendentes(tenant_id: int, limite: int = 500) -> list[dict]:
     conn = connection_mysql()
     cursor = conn.cursor(dictionary=True)
     cursor.execute(
         """
         SELECT * FROM produto_sances_raw
-        WHERE tenant_id = %s AND pipeline = %s AND processado_em IS NULL
+        WHERE tenant_id = %s AND processado_em IS NULL
         ORDER BY id
         LIMIT %s
         """,
-        (tenant_id, pipeline, limite),
+        (tenant_id, limite),
     )
     linhas = cursor.fetchall()
     cursor.close()

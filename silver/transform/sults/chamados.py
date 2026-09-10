@@ -72,7 +72,7 @@ def transformar_chamados(
             codigo = raw.get("codigo")
             
             if not codigo:
-                logger.warning(f"Registro raw sem código — ignorado")
+                # logger.warning(f"Registro raw sem código — ignorado")
                 continue
             
             # Converte datas
@@ -176,7 +176,7 @@ def transformar_chamados(
             departamento_id = raw.get("departamento_id")
 
             if not chamado_codigo or not pessoa_id:
-                logger.warning("Apoio raw sem chave mínima — ignorado")
+                # logger.warning("Apoio raw sem chave mínima — ignorado")
                 continue
 
             chave = (chamado_codigo, pessoa_id, departamento_id)
@@ -214,7 +214,7 @@ def transformar_chamados(
             etiqueta_id = raw.get("etiqueta_id")
             
             if not codigo or not etiqueta_id:
-                logger.warning(f"Etiqueta raw inválida — ignorada")
+                # logger.warning(f"Etiqueta raw inválida — ignorada")
                 continue
             
             etiqueta_bi = {
@@ -230,12 +230,12 @@ def transformar_chamados(
                 exc_info=True
             )
     
-    logger.info(
-        f"Silver Transform concluído: "
-        f"{len(chamados_bi)} chamados | "
-        f"{len(apoios_bi)} apoios | "
-        f"{len(etiquetas_bi)} etiquetas"
-    )
+    #logger.info(
+    #    f"Silver Transform concluído: "
+    #    f"{len(chamados_bi)} chamados | "
+    #    f"{len(apoios_bi)} apoios | "
+    #    f"{len(etiquetas_bi)} etiquetas"
+    #)
     
     return {
         "chamados": chamados_bi,

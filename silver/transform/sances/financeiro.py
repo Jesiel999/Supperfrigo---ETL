@@ -19,10 +19,7 @@ def _to_date(valor) -> date | None:
 
 
 def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[dict]:
-    """
-    Transforma registros do financeiro_raw para financeiro_bi.
-    tenant_id é obrigatório — garante isolamento multi-tenant.
-    """
+
     resultado: list[dict] = []
     hoje = date.today()
 
@@ -118,7 +115,7 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
                 "dias_recebimento":            dias_recebimento,
 
                 # ── Data ──────────────────────────────────────
-                "criado_em":                   raw.get("data_alteracao"),
+                "atualizado_em":                   raw.get("data_alteracao"),
             }
 
             resultado.append(bi)
@@ -126,5 +123,39 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
         except Exception as e:
             logger.error(f"Erro ao transformar registro {raw.get('codigo')} tenant={tenant_id}: {e}")
 
-    logger.info(f"Silver tenant={tenant_id}: {len(resultado)} registros transformados.")
+    return resultado
+
+
+def transformar_recebimentos(registros_raw: list[dict], tenant_id: int) -> list[dict]:
+
+    resultado: list[dict] = []
+
+    for raw in registros_raw:
+        try:
+            bi = {
+                "tenant_id":                   tenant_id,
+                "codigo_raw":                  raw.get("id"),
+                "codigo_tipo_movimentacao":    raw.get("codigo_tipo_movimentacao"),
+                "descricao_tipo_movimentacao": raw.get("descricao_tipo_movimentacao"),
+                "valor_pago":                  raw.get("valor_pago"),
+                "valor_nominal":               raw.get("valor_nominal"),
+                "data_movimentacao":           _to_date(raw.get("data_movimentacao")),
+                "codigo_conta":                raw.get("codigo_conta"),
+                "descricao_conta":             raw.get("descricao_conta"),
+                "historico":                   raw.get("historico"),
+                "data_conciliacao":            raw.get("data_conciliacao"),
+                "codigo_caixa":                raw.get("codigo_caixa"),
+                "codigo_cheque_terceiro":      raw.get("codigo_cheque_terceiro"),
+                "codigo_pagamento_cartao":     raw.get("codigo_pagamento_cartao"),
+                "desconto":                    raw.get("desconto"),
+                "acrescimo":                   raw.get("acrescimo"),
+                "juros":                       raw.get("juros"),
+                "multa":                       raw.get("multa"),
+                "criado_em":                   raw.get("data_alteracao"),
+            }
+            resultado.append(bi)
+
+        except Exception as e:
+            logger.error(f"Erro ao transformar recebimento id={raw.get('id')}: {e}")
+
     return resultado

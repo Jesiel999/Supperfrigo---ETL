@@ -27,7 +27,7 @@ def _converter_data_br(valor) -> str | None:
     try:
         return datetime.strptime(str(valor).strip(), "%d/%m/%Y").strftime("%Y-%m-%d")
     except Exception:
-        logger.warning(f"vencimento_parcela em formato inesperado: {valor}")
+        # logger.warning(f"vencimento_parcela em formato inesperado: {valor}")
         return None
 
 
@@ -265,7 +265,7 @@ def salvar_pagina_raw(tenant_id: int, offset_pagina: int, itens: list[dict]) -> 
                 )
 
         conn.commit()
-        logger.info(f"[pos_venda] tenant={tenant_id} página={offset_pagina}: {len(codigos_origem)} pós-vendas persistidos.")
+        # logger.info(f"[pos_venda] tenant={tenant_id} página={offset_pagina}: {len(codigos_origem)} pós-vendas persistidos.")
 
     except Exception:
         conn.rollback()
