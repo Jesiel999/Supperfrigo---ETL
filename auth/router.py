@@ -135,7 +135,7 @@ def _montar_usuario_completo(user: dict, tenant_id: int | None = None) -> dict:
         )
         empresas = cursor.fetchall()
         # ---- Loger de retorno de empresas
-        # logger.info("Empresas retornadas: %s", empresas)
+        # # logger.info("Empresas retornadas: %s", empresas)
         cursor.execute(
             """
             SELECT t.id, t.nome, t.slug

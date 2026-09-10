@@ -19,7 +19,7 @@ def buscar_token_por_nome(nome: str) -> str | None:
     conn.close()
 
     if not row:
-        logger.warning(f"Nenhum token ativo encontrado em tenant_config para nome={nome}")
+        # logger.warning(f"Nenhum token ativo encontrado em tenant_config para nome={nome}")
         return None
 
     return row["token"]

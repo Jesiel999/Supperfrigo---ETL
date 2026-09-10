@@ -22,7 +22,7 @@ def upsert_chamados_etiqueta_raw(registros: list[dict]) -> dict:
     """
     
     if not registros:
-        logger.warning("upsert_chamados_etiqueta_raw chamado com lista vazia.")
+        # logger.warning("upsert_chamados_etiqueta_raw chamado com lista vazia.")
         return {"inseridos": 0, "atualizados": 0, "erros": 0}
     
     conn = connection_mysql()
@@ -101,7 +101,7 @@ def upsert_chamados_etiqueta_raw(registros: list[dict]) -> dict:
             
             if i % BATCH_COMMIT == 0:
                 conn.commit()
-                logger.info(f"Commit parcial etiqueta_raw: {i} registros processados")
+                # logger.info(f"Commit parcial etiqueta_raw: {i} registros processados")
         
         conn.commit()
     
@@ -109,12 +109,12 @@ def upsert_chamados_etiqueta_raw(registros: list[dict]) -> dict:
         cursor.close()
         conn.close()
     
-    logger.info(
-        f"chamados_etiqueta_raw | "
-        f"INSERT={inseridos} "
-        f"UPDATE={atualizados} "
-        f"ERRO={erros}"
-    )
+    # logger.info(
+    #    f"chamados_etiqueta_raw | "
+    #    f"INSERT={inseridos} "
+    #    f"UPDATE={atualizados} "
+    #    f"ERRO={erros}"
+    #)
     
     return {
         "inseridos": inseridos,
@@ -142,7 +142,7 @@ def upsert_dim_etiqueta(registros: list[dict]) -> dict:
     """
     
     if not registros:
-        logger.warning("upsert_dim_etiqueta chamado com lista vazia.")
+        # logger.warning("upsert_dim_etiqueta chamado com lista vazia.")
         return {"inseridos": 0, "atualizados": 0, "erros": 0}
     
     conn = connection_mysql()
@@ -209,12 +209,12 @@ def upsert_dim_etiqueta(registros: list[dict]) -> dict:
         cursor.close()
         conn.close()
     
-    logger.info(
-        f"dim_etiqueta | "
-        f"INSERT={inseridos} "
-        f"UPDATE={atualizados} "
-        f"ERRO={erros}"
-    )
+    # logger.info(
+    #    f"dim_etiqueta | "
+    #    f"INSERT={inseridos} "
+    #    f"UPDATE={atualizados} "
+    #    f"ERRO={erros}"
+    #)
     
     return {
         "inseridos": inseridos,
@@ -241,7 +241,7 @@ def upsert_chamados_etiqueta_bi(registros: list[dict]) -> dict:
     """
     
     if not registros:
-        logger.warning("upsert_chamados_etiqueta_bi chamado com lista vazia.")
+        # logger.warning("upsert_chamados_etiqueta_bi chamado com lista vazia.")
         return {"inseridos": 0, "atualizados": 0, "erros": 0}
     
     conn = connection_mysql()
@@ -313,7 +313,7 @@ def upsert_chamados_etiqueta_bi(registros: list[dict]) -> dict:
             
             if i % BATCH_COMMIT == 0:
                 conn.commit()
-                logger.info(f"Commit parcial etiqueta_bi: {i} registros processados")
+                # logger.info(f"Commit parcial etiqueta_bi: {i} registros processados")
         
         conn.commit()
     
@@ -321,12 +321,12 @@ def upsert_chamados_etiqueta_bi(registros: list[dict]) -> dict:
         cursor.close()
         conn.close()
     
-    logger.info(
-        f"chamados_etiqueta_bi | "
-        f"INSERT={inseridos} "
-        f"UPDATE={atualizados} "
-        f"ERRO={erros}"
-    )
+    # logger.info(
+    #    f"chamados_etiqueta_bi | "
+    #    f"INSERT={inseridos} "
+    #    f"UPDATE={atualizados} "
+    #    f"ERRO={erros}"
+    #)
     
     return {
         "inseridos": inseridos,

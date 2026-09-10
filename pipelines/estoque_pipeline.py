@@ -3,16 +3,17 @@ import logging
 from core.pipeline import Pipeline
 from core.step import Step
 from database.mysql_connection import connection_mysql
-from bronze.extract.sances.pos_venda import extrair_pos_venda_sances, ORIGEM as ORIGEM_POS_VENDA
-from silver.transform.sances.pos_venda import processar_pos_venda_pendentes
+from bronze.extract.sances.estoque import extrair_estoque_sances, ORIGEM as ORIGEM_ESTOQUE_SANCES
+from silver.transform.sances.estoque import processar_produtos_pendentes
 from repositories.offset_repository import ler_offset
 from repositories.tenant_repository import buscar_token_por_nome
-from config.settings import URL_SANCES_POS_VENDA
+from config.settings import URL_SANCES_ESTOQUE
+
 
 logger = logging.getLogger(__name__)
 
 
-class StepExtrairPosVenda(Step):
+class StepExtrairEstoque(Step):
 
     def __init__(
         self,
@@ -22,8 +23,9 @@ class StepExtrairPosVenda(Step):
         offset_inicial: int | None = None,
         filtros: dict | None = None,
     ):
-        super().__init__("ExtrairPosVenda")
-        
+
+        super().__init__("ExtrairEstoque")
+
         self.tenant_id = tenant_id
         self.token = token
         self.limit = limit
@@ -32,7 +34,7 @@ class StepExtrairPosVenda(Step):
 
     def execute(self, context: dict) -> dict:
 
-        resultado = extrair_pos_venda_sances(
+        resultado = extrair_estoque_sances(
             tenant_id=self.tenant_id,
             token=self.token,
             limit=self.limit,
@@ -40,21 +42,29 @@ class StepExtrairPosVenda(Step):
             filtros=self.filtros,
         )
 
-        context["bronze_pos_venda_resultado"] = resultado
+        context["bronze_estoque_resultado"] = resultado
 
         context["tenant_id"] = self.tenant_id
+
+        # logger.info(
+        #    f"[BRONZE-ESTOQUE] "
+        #    f"tenant={self.tenant_id} | "
+        #    f"páginas={resultado.get('paginas', 0)} | "
+        #    f"registros={resultado.get('registros', 0)} | "
+        #    f"status={resultado.get('status')}"
+        #)
 
         return context
 
 
-class StepTransformarPosVenda(Step):
+class StepTransformarEstoque(Step):
 
     def __init__(
         self,
-        limite_por_execucao: int = 500
+        limite_por_execucao: int = 500,
     ):
 
-        super().__init__("TransformarPosVenda")
+        super().__init__("TransformarEstoque")
 
         self.limite_por_execucao = limite_por_execucao
 
@@ -65,19 +75,23 @@ class StepTransformarPosVenda(Step):
 
         tenant_id = context["tenant_id"]
 
-        resultado = processar_pos_venda_pendentes(
+        resultado = processar_produtos_pendentes(
             tenant_id=tenant_id,
-            limite=self.limite_por_execucao
+            limite=self.limite_por_execucao,
         )
 
-        context["silver_pos_venda_resultado"] = resultado
+        context["silver_estoque_resultado"] = resultado
 
-        # logger.info(f"[SILVER-POS_VENDA] tenant={tenant_id} {resultado}")
+        # logger.info(
+        #    f"[SILVER-ESTOQUE] "
+        #    f"tenant={tenant_id} | "
+        #    f"{resultado}"
+        # )
 
         return context
 
 
-def executar_pipeline_pos_venda(
+def executar_pipeline_estoque(
     tenant_id: int,
     limit: int = 100,
     offset_inicial: int | None = None,
@@ -91,7 +105,8 @@ def executar_pipeline_pos_venda(
 
     if not token:
         raise ValueError(
-            "Token SANCES_TOKEN não encontrado (ou inativo) em tenant_config."
+            "Token SANCES_TOKEN não encontrado "
+            "(ou inativo) em tenant_config."
         )
 
     # ---------------------------------------------------------
@@ -100,7 +115,7 @@ def executar_pipeline_pos_venda(
 
     offset = ler_offset(
         tenant_id=tenant_id,
-        origem=ORIGEM_POS_VENDA,
+        origem=ORIGEM_ESTOQUE_SANCES,
         offset_inicial=offset_inicial,
     )
 
@@ -124,7 +139,7 @@ def executar_pipeline_pos_venda(
             """,
             (
                 tenant_id,
-                ORIGEM_POS_VENDA,
+                ORIGEM_ESTOQUE_SANCES,
             ),
         )
 
@@ -138,22 +153,22 @@ def executar_pipeline_pos_venda(
     # ---------------------------------------------------------
     # SE NÃO EXISTIR PIPELINE_OFFSET
     # ---------------------------------------------------------
-    
+
     if not pipeline_offset:
 
         raise RuntimeError(
             "Registro pipeline_offset não encontrado "
             f"para tenant={tenant_id}, "
-            f"origem={ORIGEM_POS_VENDA}."
+            f"origem={ORIGEM_ESTOQUE_SANCES}."
         )
 
     pipeline = (
         Pipeline(
-            f"PosVendaPipeline-tenant{tenant_id}"
+            f"EstoquePipeline-tenant{tenant_id}"
         )
 
         .add_step(
-            StepExtrairPosVenda(
+            StepExtrairEstoque(
                 tenant_id=tenant_id,
                 token=token,
                 limit=limit,
@@ -163,7 +178,7 @@ def executar_pipeline_pos_venda(
         )
 
         .add_step(
-            StepTransformarPosVenda(
+            StepTransformarEstoque(
                 limite_por_execucao=
                     limite_silver_por_execucao
             )
@@ -181,9 +196,9 @@ def executar_pipeline_pos_venda(
                 offset,
 
             "origem":
-                ORIGEM_POS_VENDA,
+                ORIGEM_ESTOQUE_SANCES,
 
             "endpoint":
-                URL_SANCES_POS_VENDA,
+                URL_SANCES_ESTOQUE,
         }
     )

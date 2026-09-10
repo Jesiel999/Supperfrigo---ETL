@@ -5,26 +5,19 @@ import logging
 
 from requests.exceptions import ConnectionError, Timeout, RequestException
 from datetime import datetime
-
-from config.settings import (
-    SANCES_TOKEN,
-    URL_SANCES_FINANCEIRO,
-    REQUEST_TIMEOUT,
-    RATE_LIMIT_SLEEP,
-    SLEEP_REQUEST,
-)
+from repositories.sances.financeiro_repository import salvar_pagina_raw
+from bronze.extract._base import extrair_paginado_sem_filtro
+from config.settings import SANCES_TOKEN, URL_SANCES_FINANCEIRO, REQUEST_TIMEOUT, RATE_LIMIT_SLEEP, SLEEP_REQUEST
 from core.logger import get_layer_logger
 
 class RateLimitAtingido(Exception):
     """Exceção utilizada para encerrar a extração quando atingir rate limit."""
     pass
-    
+
 logger = get_layer_logger("bronze", "financeiro")
 
-HEADERS = {"Authorization": f"Bearer {'SANCES_TOKEN'}"}
-
 # ==========================================
-# CAMPOS PERMITIDOS
+# CAMPOS PERMITIDOS (título)
 # ==========================================
 CAMPOS_PERMITIDOS = [
     "codigo", "tipo_titulo",
@@ -69,27 +62,12 @@ CAMPOS_DATA = [
     "data_emissao", "data_competencia", "data_vencimento",
     "data_insercao", "data_alteracao",
     "data_cancelamento", "data_baixa", "data_aprovacao",
+    "data_pagamento",
 ]
-
-OFFSET_FILE = "logs/bronze/financeiro_offset.txt"
-
 
 # ==========================================
 # HELPERS
 # ==========================================
-
-def _normalizar(valor) -> str:
-    if valor is None:
-        return ""
-    valor = str(valor).strip().replace("T", " ")
-    if "+" in valor:
-        valor = valor.split("+")[0]
-    if "Z" in valor:
-        valor = valor.replace("Z", "")
-    if "." in valor:
-        valor = valor.split(".")[0]
-    return valor.strip()
-
 
 def _converter_data(data_str) -> str | None:
     if not data_str:
@@ -117,283 +95,109 @@ def _converter_data(data_str) -> str | None:
 
 
 def _filtrar_item(item: dict) -> dict:
-    """Converte datas e filtra apenas campos permitidos."""
+    """Converte datas e filtra apenas campos permitidos do TÍTULO (não inclui recebimentos)."""
     for campo in CAMPOS_DATA:
         if campo in item and item[campo]:
             item[campo] = _converter_data(item[campo])
+
     return {k: v for k, v in item.items() if k in CAMPOS_PERMITIDOS}
 
 
-def _salvar_offset(offset: int, offset_file: str):
-    """Persiste o offset atual em disco."""
-    os.makedirs("logs/bronze", exist_ok=True)
-    with open(offset_file, "w") as f:
-        f.write(str(offset))
-
-
-def _resetar_offset(offset_file: str):
+def _extrair_recebimentos(item: dict, codigo_titulo, tenant_id: int) -> list[dict]:
     """
-    Reseta o offset para 1 após conclusão bem-sucedida.
-    Na próxima execução a varredura começa do início.
+    Extrai o array 'recebimentos' do título antes da filtragem principal
+    (senão seria descartado, já que não está em CAMPOS_PERMITIDOS).
+
+    Diferente de arrays aninhados de outras pipelines (pós-venda), aqui
+    cada recebimento já vem com 'codigo' próprio e estável — dá pra fazer
+    upsert direto por essa chave, sem precisar de delete+insert.
     """
-    _salvar_offset(1, offset_file)
-    logger.info(f"Offset resetado para 1. Próxima execução varre do início: {offset_file}.")
+    recebimentos = item.get("recebimentos") or []
+    
+    linhas = []
 
+    data_alteracao_titulo = _converter_data(
+        item.get("data_alteracao")
+    )
 
-def _ler_offset(offset_inicial: int | None, offset_file: str | None) -> int:
-    """
-    Retorna o offset de onde a extração deve começar.
-    Prioridade:
-      1. offset_inicial passado por parâmetro (ex: forçar início manual)
-      2. Offset salvo em disco (retomar de onde parou após falha)
-      3. 1 (padrão — primeira execução)
-    """
-    if offset_inicial is not None:
-        logger.info(f"Offset forçado por parâmetro: {offset_inicial}")
-        return offset_inicial
-
-    if os.path.exists(offset_file):
-        with open(offset_file) as f:
-            valor = f.read().strip()
-        if valor.isdigit():
-            offset = int(valor)
-            logger.info(f"Offset recuperado do disco ({offset_file}): {offset}")
-            return offset
-
-    logger.info("Nenhum offset salvo em {offset_file}. Iniciando do offset 1.")
-    return 1
-
-
-def _fetch_page(
-    limit: int,
-    offset: int,
-    extra_params: dict | None = None,
-    offset_file: str | None = None,
-) -> list[dict] | None:
-    """
-    Busca uma página da API.
-
-    Returns:
-        list[dict]  — registros da página (pode ser lista vazia = fim dos dados)
-        None        — falha definitiva (erro HTTP não recuperável)
-    """
-    params = {"limit": limit, "offset": offset}
-    if extra_params:
-        params.update(extra_params)
-
-    response = None
-
-    while True:
-        try:
-            response = requests.get(
-                URL_SANCES_FINANCEIRO,
-                headers=HEADERS,
-                params=params,
-                timeout=REQUEST_TIMEOUT,
-            )
-            logger.info(f"GET {response.url} -> {response.status_code}")
-
-            # ==========================================
-            # RATE LIMIT — aguarda e tenta de novo
-            # ==========================================
-            if response.status_code == 429:
-                logger.warning(
-                    f"Rate limit atingido na página {offset}. "
-                    f"Encerrando Bronze e salvando offset para continuação futura."
-                )
-
-                _salvar_offset(offset, offset_file)
-
-                raise RateLimitAtingido(
-                    f"Rate limit atingido na página {offset}"
-                )
-
-            if response.status_code == 200:
-                break
-
-            # ==========================================
-            # ERRO HTTP DEFINITIVO
-            # ==========================================
-            logger.error(
-                f"Erro HTTP {response.status_code} na página {offset}: "
-                f"{response.text[:300]}"
-            )
-            _salvar_offset(offset, offset_file)
-            return None
-
-        except Timeout:
-            logger.warning(f"Timeout na página {offset}. Aguardando 5s e tentando de novo...")
-            time.sleep(5)
-
-        except ConnectionError:
-            logger.warning(f"Erro de conexão na página {offset}. Aguardando 5s...")
-            time.sleep(5)
-
-        except RequestException as e:
-            logger.error(f"Erro de request inesperado na página {offset}: {e}")
-            time.sleep(5)
-
-    try:
-        dados = response.json().get("dados", [])
-        return dados
-    except Exception as e:
-        logger.error(f"Erro ao parsear JSON da página {offset}: {e}")
-        _salvar_offset(offset, offset_file)
-        return None
+    for r in recebimentos:
+        codigo = r.get("codigo")
+        if not codigo:
+            continue
+        linhas.append({
+            "tenant_id": tenant_id,
+            "id": codigo,
+            "codigo_titulo": codigo_titulo,
+            "codigo_tipo_movimentacao": r.get("codigo_tipo_movimentacao"),
+            "descricao_tipo_movimentacao": r.get("descricao_tipo_movimentacao"),
+            "valor_pago": r.get("valor_pago"),
+            "valor_nominal": r.get("valor_nominal"),
+            "data_movimentacao": _converter_data(r.get("data_movimentacao")),
+            "data_alteracao": data_alteracao_titulo,
+            "codigo_conta": r.get("codigo_conta"),
+            "descricao_conta": r.get("descricao_conta"),
+            "historico": r.get("historico"),
+            "data_conciliacao": _converter_data(r.get("data_conciliacao")),
+            "codigo_caixa": r.get("codigo_caixa"),
+            "codigo_cheque_terceiro": r.get("codigo_cheque_terceiro"),
+            "codigo_pagamento_cartao": r.get("codigo_pagamento_cartao"),
+            "desconto": r.get("desconto"),
+            "acrescimo": r.get("acrescimo"),
+            "juros": r.get("juros"),
+            "multa": r.get("multa"),
+        })
+    return linhas
 
 
 # ==========================================
 # INTERFACE PÚBLICA
 # ==========================================
 
-def extrair_financeiro(
+def extrair_financeiro_sances(
+    tenant_id: int,
+    origem: str,
+    token: str | None = None,
     limit: int = 100,
     offset_inicial: int | None = None,
-    extra_params: dict | None = None,
-    data_vencimento_inicial: str | None = None,
-    data_vencimento_final: str | None = None,
-    data_insercao_inicial: str | None = None,
-    data_insercao_final: str | None = None,
-    codigo_situacao: str | None = None,
-    offset_file: str = OFFSET_FILE,
-) -> list[dict]:
-    """
-    Extrai todos os registros financeiros da API Sances paginando
-    automaticamente até não haver mais dados.
+    filtros: dict | None = None,
+) -> dict:
+    headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
+    extra_params = filtros or {}
 
-    Comportamento do offset:
-      - Se a extração terminar com SUCESSO (API retornou vazio = fim dos dados),
-        o offset é RESETADO para 1. A próxima execução varre tudo do início.
-      - Se a extração for INTERROMPIDA por erro (HTTP, conexão, etc.),
-        o offset é MANTIDO na página onde falhou. A próxima execução
-        RETOMA de onde parou.
+    def _persistir_pagina(itens: list[dict], offset: int, limit_usado: int) -> None:
+        titulos_filtrados = []
+        recebimentos_para_salvar = []
 
-    Args:
-        limit:               Registros por página. Máximo 100 (limite da API).
-        offset_inicial:      Força início em uma página específica.
-                             Se None, usa o offset salvo ou começa do 1.
-        data_vencimento_inicial:Filtra registros com data_baixa >= este valor.
-                             Formato: "YYYY-MM-DD". Ex: "2024-01-01"
-        data_vencimento_final:Filtra registros com data_baixa <= este valor.
-                             Formato: "YYYY-MM-DD". Ex: "2024-12-31"
-                             Se None, traz até a data de hoje.
-        data_insercao_inicial:  Filtra registros com data_vencimento >= este valor.
-                             Formato: "YYYY-MM-DD". Ex: "2024-01-01"
-        data_insercao_final:    Filtra registros com data_vencimento <= este valor.
-                             Formato: "YYYY-MM-DD". Ex: "2024-12-31"
-                             Se None, traz até a data de hoje.
-        extra_params:        Qualquer outro parâmetro aceito pela API Sances.
-                             Ex: {"tipo_titulo": "RECEBER", "codigo_empresa": "1"}
-        codigo_situacao: filtra pela situação do título.
-                          Valores: a, t, p, c, r, u, x
-        offset_file:      caminho do arquivo de controle de paginação.
-                          Use um arquivo diferente por job (diário/total/situação)
-                          para evitar que um job sobrescreva o progresso do outro.
+        for item in itens:
+            codigo_titulo = item.get("codigo")
+            if not codigo_titulo:
+                continue
 
-    Returns:
-        Lista de dicts com os campos de CAMPOS_PERMITIDOS,
-        com datas já convertidas para "YYYY-MM-DD HH:MM:SS".
-    """
-    os.makedirs("logs/bronze", exist_ok=True)
-
-    # ==========================================
-    # MONTA PARÂMETROS DE FILTRO
-    # ==========================================
-    params_extra: dict = extra_params.copy() if extra_params else {}
-
-    if data_vencimento_inicial:
-        params_extra["data_vencimento_inicial"] = data_vencimento_inicial
-        logger.info(f"Filtro data_vencimento_inicial: {data_vencimento_inicial}")
-
-    if data_vencimento_final:
-        params_extra["data_vencimento_final"] = data_vencimento_final
-        logger.info(f"Filtro data_vencimento_final: {data_vencimento_final}")
-
-    if data_insercao_inicial:
-        params_extra["data_insercao_inicial"] = data_insercao_inicial
-        logger.info(f"Filtro data_insercao_inicial: {data_insercao_inicial}")
-    
-    if data_insercao_final:
-        params_extra["data_insercao_final"] = data_insercao_final
-        logger.info(f"Filtro data_insercao_final: {data_insercao_final}")
-    
-    if codigo_situacao:
-        params_extra["codigo_situacao"] = codigo_situacao
-        logger.info(f"Filtro de situcao: {codigo_situacao}")
-
-    # ==========================================
-    # DETERMINA OFFSET DE INÍCIO
-    # ==========================================
-    offset = _ler_offset(offset_inicial, offset_file)
-
-    todos_registros: list[dict] = []
-    extracao_ok = False
-
-    # ==========================================
-    # LOOP DE PAGINAÇÃO
-    # ==========================================
-    while True:
-
-        # ==========================================
-        # FALHA DEFINITIVA NA API
-        # ==========================================
-
-        try:
-            dados = _fetch_page(
-                limit=limit,
-                offset=offset,
-                extra_params=params_extra if params_extra else None,
-                offset_file=offset_file,
+            # extrai recebimentos ANTES da filtragem (senão _filtrar_item descarta)
+            recebimentos_para_salvar.extend(
+                _extrair_recebimentos(item, codigo_titulo, tenant_id)
             )
 
-        except RateLimitAtingido:
-            logger.warning(
-                f"Extração interrompida por rate limit. "
-                f"Retornando {len(todos_registros)} registros já coletados."
-            )
-
-            extracao_ok = True
-            break
-
-        # ==========================================
-        # FIM DOS DADOS
-        # ==========================================
-        if not dados:
-            logger.info(
-                f"Página {offset} veio vazia (situacao={codigo_situacao}) — fim dos registros. "
-                f"Total extraído: {len(todos_registros)} registros."
-            )
-            extracao_ok = True
-            
-            if extracao_ok:
-                _resetar_offset(offset_file)
-            break
-
-        logger.info(f"Página {offset} (situacao={codigo_situacao}): {len(dados)} registros recebidos.")
-
-        # ==========================================
-        # PROCESSA REGISTROS DA PÁGINA
-        # ==========================================
-        for item in dados:
             filtrado = _filtrar_item(item)
-            if filtrado.get("codigo"):
-                todos_registros.append(filtrado)
+            filtrado["tenant_id"] = tenant_id
+            titulos_filtrados.append(filtrado)
 
-        # ==========================================
-        # SALVA PROGRESSO E AVANÇA
-        # ==========================================
-        _salvar_offset(offset, offset_file)
-        time.sleep(SLEEP_REQUEST)
-        offset += 1
-
-    else:
-        logger.warning(
-            "Extração encerrada com falha. "
-            "Execute novamente para retomar do ponto de parada."
+        salvar_pagina_raw(
+            tenant_id=tenant_id,
+            itens=titulos_filtrados,
+            recebimentos=recebimentos_para_salvar,
         )
 
-    logger.info(
-        f"Extração finalizada | situacao={codigo_situacao} | "
-        f"registros={len(todos_registros)} | sucesso={extracao_ok}"
+    return extrair_paginado_sem_filtro(
+        url=URL_SANCES_FINANCEIRO,
+        headers=headers,
+        origem=origem,
+        tenant_id=tenant_id,
+        on_page=_persistir_pagina,
+        logger=logger,
+        limit=limit,
+        offset_inicial=offset_inicial,
+        extra_params=extra_params,
+        timeout=REQUEST_TIMEOUT,
+        sleep_request=SLEEP_REQUEST,
     )
-    return todos_registros

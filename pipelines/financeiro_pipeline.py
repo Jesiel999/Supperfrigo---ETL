@@ -1,16 +1,13 @@
 import logging
+
 from core.pipeline import Pipeline
 from core.step import Step
 from database.mysql_connection import connection_mysql
-
-from bronze.extract.sances.financeiro import extrair_financeiro
-from silver.transform.sances.financeiro.financeiro import transformar_financeiro
-
-from repositories.sances.financeiro_repository import (
-    upsert_financeiro_raw,
-    buscar_raw_para_transform,
-    upsert_financeiro_bi
-)
+from bronze.extract.sances.financeiro import extrair_financeiro_sances
+from silver.transform.sances.financeiro import transformar_financeiro, transformar_recebimentos
+from config.settings import SANCES_TOKEN, URL_SANCES_FINANCEIRO, REQUEST_TIMEOUT, RATE_LIMIT_SLEEP, SLEEP_REQUEST
+from repositories.offset_repository import ler_offset
+from repositories.sances.financeiro_repository import upsert_financeiro_raw, buscar_raw_para_transform, upsert_financeiro_bi, buscar_recebimentos_raw_para_transform, upsert_recebimentos_bi
 from repositories.tenant_repository import buscar_token_por_nome
 
 logger = logging.getLogger(__name__)
@@ -25,158 +22,140 @@ class StepExtrairFinanceiro(Step):
         self,
         tenant_id:          int,
         token:              str,
-        data_vencimento_inicial: str | None = None,
-        data_vencimento_final:   str | None = None,
-        data_insercao_inicial: str | None = None,
-        data_insercao_final: str | None = None,
-        codigo_situacao: str | None = None,
-        offset_file: str | None = None
+        origem: str,
+        limit: int = 100,
+        offset_inicial: int | None = None,
+        filtros: dict | None = None,
     ):
         super().__init__("ExtrairFinanceiro")
         self.tenant_id          = tenant_id
         self.token       = token
-        self.data_vencimento_inicial = data_vencimento_inicial
-        self.data_vencimento_final   = data_vencimento_final
-        self.data_insercao_inicial = data_insercao_inicial
-        self.data_insercao_final = data_insercao_final
-        self.codigo_situacao = codigo_situacao
-        self.offset_file = offset_file or f"logs/bronze/financeiro_offset_{self.tenant_id}.txt"
+        self.origem = origem
+        self.limit = limit
+        self.offset_inicial = offset_inicial
+        self.filtros = filtros
 
     def execute(self, context: dict) -> dict:
-        registros = extrair_financeiro(
-            limit=100,
-            data_vencimento_inicial=self.data_vencimento_inicial,
-            data_vencimento_final=self.data_vencimento_final,
-            data_insercao_inicial=self.data_insercao_inicial,
-            data_insercao_final=self.data_insercao_final,
-            codigo_situacao=self.codigo_situacao,
-            offset_file=self.offset_file,
+        resultado = extrair_financeiro_sances(
+            tenant_id=self.tenant_id,
+            origem=self.origem,
+            token=self.token,
+            limit=self.limit,
+            offset_inicial=self.offset_inicial,
+            filtros=self.filtros,
         )
 
-        # Injeta tenant_id em cada registro antes de gravar
-        for r in registros:
-            r["tenant_id"] = self.tenant_id
+        context["bronze_financeiro_resultado"] = resultado
 
-        resultado = upsert_financeiro_raw(registros)
-        context["bronze_resultado"] = resultado
-        context["bronze_total"]     = len(registros)
-        context["tenant_id"]        = self.tenant_id
-        logger.info(f"[BRONZE] tenant={self.tenant_id} situacao={self.codigo_situacao} {resultado}")
+        context["tenant_id"] = self.tenant_id
+
         return context
 
 
 class StepTransformarFinanceiro(Step):
-    """Silver: lê raw do tenant, transforma, grava em financeiro_bi."""
+    """Silver: lê raw do tenant, transforma, grava em financeiro_bi e recebimentos_bi."""
 
     def __init__(self):
         super().__init__("TransformarFinanceiro")
 
     def execute(self, context: dict) -> dict:
-        tenant_id     = context["tenant_id"]
-        registros_raw = buscar_raw_para_transform()
-        registros_bi  = transformar_financeiro(registros_raw, tenant_id=tenant_id)
-        resultado     = upsert_financeiro_bi(registros_bi)
-        context["silver_resultado"] = resultado
-        context["silver_total"]     = len(registros_bi)
-        logger.info(f"[SILVER] tenant={tenant_id} {resultado}")
-        return context
+        tenant_id = context["tenant_id"]
 
+        # Títulos
+        registros_raw = buscar_raw_para_transform()
+        registros_bi = transformar_financeiro(registros_raw, tenant_id=tenant_id)
+        resultado = upsert_financeiro_bi(registros_bi)
+        context["silver_financeiro_resultado"] = resultado
+
+        # Recebimentos
+        recebimentos_raw = buscar_recebimentos_raw_para_transform()
+        recebimentos_bi = transformar_recebimentos(recebimentos_raw, tenant_id=tenant_id)
+        resultado_recebimentos = upsert_recebimentos_bi(recebimentos_bi)
+        context["silver_recebimentos_resultado"] = resultado_recebimentos
+
+        return context
 
 # ── Interface pública ─────────────────────────────────────────
 
 def executar_pipeline_financeiro(
-    tenant_id:          int,
+    tenant_id: int,
+    origem: str,
     data_vencimento_inicial: str | None = None,
-    data_vencimento_final:   str | None = None,
+    data_vencimento_final: str | None = None,
     data_insercao_inicial: str | None = None,
     data_insercao_final: str | None = None,
     codigo_situacao: str | None = None,
-    offset_file: str | None = None,
+    limit: int = 100,
+    offset_inicial: int | None = None,
 ) -> dict:
     """
-    Executa o pipeline completo Bronze → Silver → Gold
-    para um tenant específico.
-
-    O token da API Sances é buscado na tabela tenant_config.
-    
+    origem: obrigatório — identifica a trilha de offset no banco.
+            Ex: "financeiro_diario_baixa", "financeiro_total_a".
     """
+    token = buscar_token_por_nome("SANCES_TOKEN")
+    if not token:
+        raise ValueError("Token SANCES_TOKEN não encontrado (ou inativo) em tenant_config.")
 
-    def buscar_token_por_nome(tenant_id: int):
-        conn = connection_mysql()
+    filtros: dict = {}
+    if data_vencimento_inicial:
+        filtros["data_vencimento_inicial"] = data_vencimento_inicial
+    if data_vencimento_final:
+        filtros["data_vencimento_final"] = data_vencimento_final
+    if data_insercao_inicial:
+        filtros["data_insercao_inicial"] = data_insercao_inicial
+    if data_insercao_final:
+        filtros["data_insercao_final"] = data_insercao_final
+    if codigo_situacao:
+        filtros["codigo_situacao"] = codigo_situacao
+
+    # ---------------------------------------------------------
+    # DESCOBRE OFFSET ATUAL
+    # ---------------------------------------------------------
+    offset = ler_offset(
+        tenant_id=tenant_id,
+        origem=origem,
+        offset_inicial=offset_inicial,
+    )
+
+    conn = connection_mysql()
+    try:
         cursor = conn.cursor(dictionary=True)
-
-        cursor.execute("""
-            SELECT
-                tenant_id,
-                token,
-                token,
-                ativo
-            FROM tenant_config
-            WHERE tenant_id = %s
-            AND ativo = 1
-        """, (tenant_id,))
-
-        config = cursor.fetchone()
-
+        cursor.execute(
+            """
+            SELECT id, offset_atual
+            FROM pipeline_offset
+            WHERE tenant_id = %s AND origem = %s
+            LIMIT 1
+            """,
+            (tenant_id, origem),
+        )
+        pipeline_offset = cursor.fetchone()
+    finally:
         cursor.close()
         conn.close()
 
-        return config
-
-    config = buscar_token_por_nome(1)
-    if not config:
-        raise ValueError(f"Tenant {tenant_id} não encontrado ou sem configuração.")
-
-    token = config.get("token")
-    if not token:
-        raise ValueError(f"Tenant {tenant_id} sem token Sances configurado.")
+    if not pipeline_offset:
+        raise RuntimeError(
+            f"Registro pipeline_offset não encontrado para tenant={tenant_id}, origem={origem}."
+        )
 
     pipeline = (
-        Pipeline(f"FinanceiroPipeline-tenant{tenant_id}")
+        Pipeline(f"FinanceiroPipeline-tenant{tenant_id}-{origem}")
         .add_step(StepExtrairFinanceiro(
             tenant_id=tenant_id,
             token=token,
-            data_vencimento_inicial=data_vencimento_inicial,
-            data_vencimento_final=data_vencimento_final,
-            data_insercao_inicial=data_insercao_inicial,
-            data_insercao_final=data_insercao_final,
-            codigo_situacao=codigo_situacao,
-            offset_file=offset_file,
+            origem=origem,
+            limit=limit,
+            offset_inicial=offset,
+            filtros=filtros,
         ))
         .add_step(StepTransformarFinanceiro())
     )
 
-    return pipeline.run({"tenant_id": tenant_id})
-
-
-def executar_todos_tenants(
-    data_vencimento_inicial: str | None = None,
-    data_vencimento_final:   str | None = None,
-    data_insercao_inicial: str | None = None,
-    data_insercao_final: str | None = None,
-) -> list[dict]:
-    """
-    Executa o pipeline para TODOS os tenants ativos.
-    Usado pelo agendador (cron/systemd).
-    """
-    from repositories.tenant_repository import listar_tenants_ativos
-
-    tenants   = listar_tenants_ativos()
-    resultados = []
-
-    for t in tenants:
-        logger.info(f"Iniciando pipeline para tenant: {t['nome']} (id={t['id']})")
-        try:
-            res = executar_pipeline_financeiro(
-                tenant_id=t["id"],
-                data_vencimento_inicial=data_vencimento_inicial,
-                data_vencimento_final=data_vencimento_final,
-                data_insercao_inicial=data_insercao_inicial,
-                data_insercao_final=data_insercao_final,
-            )
-            resultados.append({"tenant_id": t["id"], "status": "ok", **res})
-        except Exception as e:
-            logger.error(f"Erro no tenant {t['id']}: {e}")
-            resultados.append({"tenant_id": t["id"], "status": "erro", "erro": str(e)})
-
-    return resultados
+    return pipeline.run({
+        "tenant_id": tenant_id,
+        "pipeline_offset_id": pipeline_offset["id"],
+        "offset_inicial": offset,
+        "origem": origem,
+        "endpoint": URL_SANCES_FINANCEIRO,
+    })

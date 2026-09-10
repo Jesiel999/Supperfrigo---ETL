@@ -20,9 +20,9 @@ def connection_mysql():
             autocommit=False,
             connection_timeout=30
         )
-        logger.info("Conexão MySQL estabelecida com sucesso.")
+        # logger.info("Conexão MySQL estabelecida com sucesso.")
         return conn
 
     except Error as e:
-        logger.error(f"Erro ao conectar no MySQL: {e}")
+        # logger.error(f"Erro ao conectar no MySQL: {e}")
         raise

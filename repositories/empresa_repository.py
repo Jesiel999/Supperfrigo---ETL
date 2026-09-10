@@ -14,7 +14,7 @@ def upsert_empresa_bi(registros: list[dict]) -> dict:
     Usa codigo_empresa como chave única.
     """
     if not registros:
-        logger.warning("upsert_empresa_bi chamado com lista vazia.")
+        # logger.warning("upsert_empresa_bi chamado com lista vazia.")
         return {"inseridos": 0, "atualizados": 0, "erros": 0}
 
     conn = connection_mysql()
@@ -73,7 +73,7 @@ def upsert_empresa_bi(registros: list[dict]) -> dict:
         cursor.close()
         conn.close()
 
-    logger.info(f"empresa_bi | INSERT={inseridos} UPDATE={atualizados} ERRO={erros}")
+    # logger.info(f"empresa_bi | INSERT={inseridos} UPDATE={atualizados} ERRO={erros}")
 
     return {
         "inseridos": inseridos,
