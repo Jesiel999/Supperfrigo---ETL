@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `chamados_raw` (
+=======
+CREATE TABLE `chamados_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` int NOT NULL,
@@ -32,7 +36,11 @@ CREATE TABLE IF NOT EXISTS `chamados_raw` (
   `atualizado_em` datetime DEFAULT (CURRENT_TIMESTAMP)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `chamados_apoio_raw` (
+=======
+CREATE TABLE `chamados_apoio_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `chamado_codigo` int NOT NULL,
@@ -44,7 +52,11 @@ CREATE TABLE IF NOT EXISTS `chamados_apoio_raw` (
   `criado_em` datetime DEFAULT (CURRENT_TIMESTAMP)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `chamados_etiqueta_raw` (
+=======
+CREATE TABLE `chamados_etiqueta_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `chamado_codigo` int NOT NULL,
@@ -54,7 +66,11 @@ CREATE TABLE IF NOT EXISTS `chamados_etiqueta_raw` (
   `criado_em` datetime DEFAULT (CURRENT_TIMESTAMP)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_raw` (
+=======
+CREATE TABLE `pos_venda_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint AUTO_INCREMENT,
@@ -140,7 +156,11 @@ CREATE TABLE IF NOT EXISTS `pos_venda_raw` (
   PRIMARY KEY (`id`, `codigo`)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_peca_raw` (
+=======
+CREATE TABLE `pos_venda_peca_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint AUTO_INCREMENT,
@@ -166,7 +186,11 @@ CREATE TABLE IF NOT EXISTS `pos_venda_peca_raw` (
   PRIMARY KEY (`id`, `codigo`)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_servico_raw` (
+=======
+CREATE TABLE `pos_venda_servico_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint AUTO_INCREMENT,
@@ -192,7 +216,11 @@ CREATE TABLE IF NOT EXISTS `pos_venda_servico_raw` (
   PRIMARY KEY (`id`, `codigo`)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_nota_raw` (
+=======
+CREATE TABLE `pos_venda_nota_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint AUTO_INCREMENT,
@@ -207,7 +235,11 @@ CREATE TABLE IF NOT EXISTS `pos_venda_nota_raw` (
   PRIMARY KEY (`id`, `codigo`)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_parcela_raw` (
+=======
+CREATE TABLE `pos_venda_parcela_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint AUTO_INCREMENT,
@@ -220,7 +252,11 @@ CREATE TABLE IF NOT EXISTS `pos_venda_parcela_raw` (
   PRIMARY KEY (`id`, `codigo`)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `telemetria_raw` (
+=======
+CREATE TABLE `telemetria_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` bigint NOT NULL,
   `dispositivo_id` varchar(100),
@@ -263,7 +299,11 @@ CREATE TABLE IF NOT EXISTS `telemetria_raw` (
   `atualizado_em` datetime(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3))
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_sances_raw` (
+=======
+CREATE TABLE `pessoa_sances_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `codigo_cliente` int PRIMARY KEY,
   `tipo` varchar(10),
   `cpf_cnpj` varchar(255),
@@ -271,14 +311,22 @@ CREATE TABLE IF NOT EXISTS `pessoa_sances_raw` (
   `sexo` varchar(30)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `email_sances_raw` (
+=======
+CREATE TABLE `email_sances_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `pessoa_id` int NOT NULL,
   `tipo` varchar(20),
   `email` varchar(500)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `endereco_sances_raw` (
+=======
+CREATE TABLE `endereco_sances_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `pessoa_id` int NOT NULL,
   `rua` varchar(255),
@@ -290,7 +338,11 @@ CREATE TABLE IF NOT EXISTS `endereco_sances_raw` (
   `cep` varchar(10)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `telefone_sances_raw` (
+=======
+CREATE TABLE `telefone_sances_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `pessoa_id` int NOT NULL,
   `celular` varchar(20),
@@ -298,7 +350,11 @@ CREATE TABLE IF NOT EXISTS `telefone_sances_raw` (
   `residencial` varchar(20)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `financeiro_raw` (
+=======
+CREATE TABLE `financeiro_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint UNIQUE NOT NULL,
@@ -388,7 +444,11 @@ CREATE TABLE IF NOT EXISTS `financeiro_raw` (
   `retencao_total` decimal(15,2)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `recebimentos_raw` (
+=======
+CREATE TABLE `recebimentos_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `codigo_titulo` bigint,
   `codigo_tipo_movimentacao` int,
@@ -409,7 +469,11 @@ CREATE TABLE IF NOT EXISTS `recebimentos_raw` (
   `multa` decimal(15,2)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `modelo_veiculo_sances_raw` (
+=======
+CREATE TABLE `modelo_veiculo_sances_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `offset_pagina` int NOT NULL,
@@ -421,7 +485,11 @@ CREATE TABLE IF NOT EXISTS `modelo_veiculo_sances_raw` (
   `criado_em` datetime DEFAULT (CURRENT_TIMESTAMP)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `preco_sances_raw` (
+=======
+CREATE TABLE `preco_sances_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `offset_pagina` int NOT NULL,
@@ -446,7 +514,11 @@ CREATE TABLE IF NOT EXISTS `preco_sances_raw` (
   `criado_em` datetime DEFAULT (CURRENT_TIMESTAMP)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `produto_sances_raw` (
+=======
+CREATE TABLE `produto_sances_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `offset_pagina` int NOT NULL,
@@ -471,7 +543,11 @@ CREATE TABLE IF NOT EXISTS `produto_sances_raw` (
   `criado_em` datetime DEFAULT (CURRENT_TIMESTAMP)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `quantidade_sances_raw` (
+=======
+CREATE TABLE `quantidade_sances_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `offset_pagina` int NOT NULL,
@@ -492,14 +568,22 @@ CREATE TABLE IF NOT EXISTS `quantidade_sances_raw` (
   `criado_em` datetime DEFAULT (CURRENT_TIMESTAMP)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `tenant` (
+=======
+CREATE TABLE `tenant` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `nome` varchar(120) NOT NULL,
   `slug` varchar(60) NOT NULL,
   `ativo` tinyint(1) NOT NULL DEFAULT '1'
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_sults_raw` (
+=======
+CREATE TABLE `pessoa_sults_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY,
   `nome` varchar(255),
   `ativo` boolean,
@@ -513,7 +597,11 @@ CREATE TABLE IF NOT EXISTS `pessoa_sults_raw` (
   `dtInativacao` varchar(30)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `endereco_sults_raw` (
+=======
+CREATE TABLE `endereco_sults_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `pessoa_id` int NOT NULL,
   `uf` varchar(10),
@@ -525,7 +613,11 @@ CREATE TABLE IF NOT EXISTS `endereco_sults_raw` (
   `rua` varchar(255)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `empresa_sults_raw` (
+=======
+CREATE TABLE `empresa_sults_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `pessoa_id` int NOT NULL,
   `qualificacao_nome` varchar(100),
@@ -645,7 +737,11 @@ ALTER TABLE `chamados_apoio_raw` ADD FOREIGN KEY (`chamado_codigo`) REFERENCES `
 
 ALTER TABLE `chamados_etiqueta_raw` ADD FOREIGN KEY (`chamado_codigo`) REFERENCES `chamados_raw` (`codigo`);
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `preco_sances_raw_produto_sances_raw` (
+=======
+CREATE TABLE `preco_sances_raw_produto_sances_raw` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `preco_sances_raw_codigo_produto` int,
   `produto_sances_raw_codigo` int,
   PRIMARY KEY (`preco_sances_raw_codigo_produto`, `produto_sances_raw_codigo`)

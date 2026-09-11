@@ -122,7 +122,7 @@ def extrair_paginado(
     # logger.info(f"[{origem}] Extração finalizada | tenant={tenant_id} | registros={len(todos_registros)}")
     return todos_registros
 
-def extrair_paginado_sem_filtro(
+def extrair_paginado_estoque(
     url: str,
     headers: dict,
     origem: str,

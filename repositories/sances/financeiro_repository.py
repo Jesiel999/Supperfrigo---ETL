@@ -185,211 +185,33 @@ def upsert_financeiro_raw(registros: list[dict]) -> dict:
                 """,
                 (codigo,),
             )
-
             existente = cursor.fetchone()
-
-            # =================================================
-            # REGISTRO EXISTENTE
-            # =================================================
-
-            houve_alteracao = (
-                data_mais_recente(
-                    item.get("data_alteracao"),
-                    existente.get("atualizado_em")
-                )
-                or
-                data_mais_recente(
-                    item.get("data_baixa"),
-                    existente.get("data_baixa")
-                )
-                or
-                (
-                    item.get("codigo_situacao") is not None
-                    and
-                    item.get("codigo_situacao")
-                    != existente.get("codigo_situacao")
-                )
-            )
-
-            # =================================================
-            # INSERT / UPDATE
-            # =================================================
-
-            colunas = list(item.keys())
-
-            placeholders = [
-                f"%({coluna})s"
-                for coluna in colunas
-            ]
-
-            updates = [
-                f"{coluna}=VALUES({coluna})"
-                for coluna in colunas
-                if coluna not in ("codigo", "tenant_id")
-            ]
-
-            sql = f"""
-                INSERT INTO financeiro_raw (
-                    {', '.join(colunas)}
-                )
-                VALUES (
-                    {', '.join(placeholders)}
-                )
-                ON DUPLICATE KEY UPDATE
-                    {', '.join(updates)}
-            """
-
-            try:
-
-                if not conn.is_connected():
-                    conn.reconnect(
-                        attempts=3,
-                        delay=5,
-                    )
-
-                cursor.execute(sql, item)
-
-                if existente:
-                    atualizados += 1
-                else:
-                    inseridos += 1
-
-            except Exception as e:
-
-                conn.rollback()
-
-                erros += 1
-
-                logger.error(
-                    "Erro upsert financeiro_raw "
-                    f"codigo={codigo}: {e}"
-                )
-
-            # ------------------------------------------------
-            # Commit em lote
-            # ------------------------------------------------
-
-            if i % BATCH_COMMIT == 0:
-                conn.commit()
-
-        # ----------------------------------------------------
-        # Commit final
-        # ----------------------------------------------------
-
-        conn.commit()
-
-    finally:
-
-        cursor.close()
-        conn.close()
-
-    return {
-        "inseridos": inseridos,
-        "atualizados": atualizados,
-        "ignorados": ignorados,
-        "erros": erros,
-    }
-
-
-# ============================================================
-# RECEBIMENTOS RAW
-# ============================================================
-
-def upsert_financeiro_recebimento_raw(
-    registros: list[dict],
-) -> dict:
-
-    if not registros:
-        return {
-            "inseridos": 0,
-            "atualizados": 0,
-            "ignorados": 0,
-            "erros": 0,
-        }
-
-    conn = connection_mysql()
-    cursor = conn.cursor(dictionary=True)
-
-    inseridos = 0
-    atualizados = 0
-    ignorados = 0
-    erros = 0
-
-    try:
-
-        for i, item in enumerate(registros, start=1):
-
-            codigo_titulo = item.get("codigo_titulo")
-
-            # ------------------------------------------------
-            # Validação
-            # ------------------------------------------------
-
-            if not codigo_titulo:
-                ignorados += 1
-                continue
-
-            # ------------------------------------------------
-            # Busca existente
-            # ------------------------------------------------
-
-            cursor.execute(
-                """
-                SELECT
-                    codigo_titulo,
-                    data_alteracao
-                FROM recebimentos_raw
-                WHERE codigo_titulo = %s
-                """,
-                (codigo_titulo,),
-            )
-
-            existente = cursor.fetchone()
-
-            # =================================================
-            # EXISTENTE
-            # =================================================
 
             if existente:
-
-                houve_alteracao = data_mais_recente(
-                    item.get("data_alteracao"),
-                    existente.get("data_alteracao"),
+                
+                atualizar = (
+                    data_maior(item.get("data_alteracao"), existente.get("data_alteracao")) or
+                    data_maior(item.get("data_baixa"), existente.get("data_baixa")) or
+                    data_maior(item.get("data_insercao"), existente.get("data_insercao")) or
+                    situacao(item.get("codigo_situacao"), existente.get("codigo_situacao"))
                 )
 
-                if not houve_alteracao:
+                if not atualizar:
                     ignorados += 1
                     continue
 
-            # =================================================
-            # INSERT / UPDATE
-            # =================================================
+                acao = "UPDATE"
+            else:
+                acao = "INSERT"
 
-            colunas = list(item.keys())
-
-            placeholders = [
-                f"%({coluna})s"
-                for coluna in colunas
-            ]
-
-            updates = [
-                f"{coluna}=VALUES({coluna})"
-                for coluna in colunas
-                if coluna not in (
-                    "codigo_titulo",
-                    "tenant_id",
-                )
-            ]
+            colunas      = list(item.keys())
+            placeholders = [f"%({c})s" for c in colunas]
+            updates      = [f"{c}=VALUES({c})" for c in colunas if c != "codigo"]
 
             sql = f"""
-                INSERT INTO recebimentos_raw (
-                    {', '.join(colunas)}
-                )
-                VALUES (
-                    {', '.join(placeholders)}
-                )
-                ON DUPLICATE KEY UPDATE
-                    {', '.join(updates)}
+                INSERT INTO financeiro_raw ({', '.join(colunas)})
+                VALUES ({', '.join(placeholders)})
+                ON DUPLICATE KEY UPDATE {', '.join(updates)}
             """
 
             try:
@@ -402,7 +224,9 @@ def upsert_financeiro_recebimento_raw(
 
                 cursor.execute(sql, item)
 
-                if existente:
+                if acao == "INSERT":
+                    inseridos += 1
+                else:
                     atualizados += 1
                 else:
                     inseridos += 1
@@ -634,7 +458,16 @@ def upsert_financeiro_bi(
                 cursor.execute(sql, item)
 
                 if existente:
-                    atualizados += 1
+                
+                    atualizar = (
+                        data_maior(item.get("data_alteracao"), existente.get("atualizado_em")) or
+                        data_maior(item.get("data_baixa"), existente.get("data_baixa")) or
+                        situacao(item.get("codigo_situacao"), existente.get("codigo_situacao"))
+                    )
+
+                    if not atualizar:
+                        ignorados += 1
+                        continue
                 else:
                     inseridos += 1
 

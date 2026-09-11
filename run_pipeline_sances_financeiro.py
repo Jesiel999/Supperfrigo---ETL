@@ -48,10 +48,6 @@ def executar_sances_diario():
                 "data_insercao_inicial": primeiro_dia,
                 "data_insercao_final": ultimo_dia,
             }
-            kwargs = dict(
-                data_vencimento_inicial=primeiro_dia.strftime("%Y-%m-%d"),
-                data_vencimento_final=ultimo_dia.strftime("%Y-%m-%d"),
-            )
 
         resultado = executar_pipeline_financeiro(
             tenant_id=1,

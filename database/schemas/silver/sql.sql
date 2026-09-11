@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `chamados_apoio_bi` (
+=======
+CREATE TABLE `chamados_apoio_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `empresa_id` int,
   `chamado_codigo` int,
@@ -7,7 +11,11 @@ CREATE TABLE IF NOT EXISTS `chamados_apoio_bi` (
   `pessoa_unidade` boolean
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `chamados_bi` (
+=======
+CREATE TABLE `chamados_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `codigo_raw` int NOT NULL,
   `titulo` text,
@@ -41,28 +49,44 @@ CREATE TABLE IF NOT EXISTS `chamados_bi` (
   `atualizado_em` datetime DEFAULT (CURRENT_TIMESTAMP)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `dim_departamento` (
+=======
+CREATE TABLE `dim_departamento` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `empresa_id` int,
   `departamento_id` int,
   `nome` varchar(100)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `dim_etiqueta` (
+=======
+CREATE TABLE `dim_etiqueta` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `etiqueta_id` int,
   `nome` varchar(255),
   `cor` varchar(20)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `chamados_etiqueta_bi` (
+=======
+CREATE TABLE `chamados_etiqueta_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `empresa_id` int,
   `chamado_codigo` int,
   `etiqueta_id` int
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi` (
+=======
+CREATE TABLE `pessoa_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `id_sances` int,
   `id_sults` int,
@@ -77,7 +101,11 @@ CREATE TABLE IF NOT EXISTS `pessoa_bi` (
   `colaborador` boolean
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_bi` (
+=======
+CREATE TABLE `pos_venda_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint AUTO_INCREMENT,
@@ -148,19 +176,31 @@ CREATE TABLE IF NOT EXISTS `pos_venda_bi` (
   PRIMARY KEY (`id`, `codigo`)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `condicao_pagamento` (
+=======
+CREATE TABLE `condicao_pagamento` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `codigo` bigint NOT NULL,
   `descricao` varchar(50) NOT NULL
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `tipo_os` (
+=======
+CREATE TABLE `tipo_os` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `codigo` bigint NOT NULL,
   `descricao` varchar(50) NOT NULL
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `veiculo_bi` (
+=======
+CREATE TABLE `veiculo_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo_sances` bigint,
@@ -175,7 +215,11 @@ CREATE TABLE IF NOT EXISTS `veiculo_bi` (
   `ano_modelo` smallint
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_peca_bi` (
+=======
+CREATE TABLE `pos_venda_peca_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint AUTO_INCREMENT,
@@ -199,13 +243,21 @@ CREATE TABLE IF NOT EXISTS `pos_venda_peca_bi` (
   PRIMARY KEY (`id`, `codigo`)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `motivo_cancelamento` (
+=======
+CREATE TABLE `motivo_cancelamento` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `codigo` bigint NOT NULL,
   `descricao` varchar(50) NOT NULL
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_servico_bi` (
+=======
+CREATE TABLE `pos_venda_servico_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint AUTO_INCREMENT,
@@ -232,7 +284,11 @@ CREATE TABLE IF NOT EXISTS `pos_venda_servico_bi` (
   PRIMARY KEY (`id`, `codigo`)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `nota_bi` (
+=======
+CREATE TABLE `nota_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint AUTO_INCREMENT,
@@ -249,7 +305,11 @@ CREATE TABLE IF NOT EXISTS `nota_bi` (
   PRIMARY KEY (`id`, `codigo`)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_parcela_bi` (
+=======
+CREATE TABLE `pos_venda_parcela_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo` bigint AUTO_INCREMENT,
@@ -264,7 +324,11 @@ CREATE TABLE IF NOT EXISTS `pos_venda_parcela_bi` (
   PRIMARY KEY (`id`, `codigo`)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `telemetria_bi` (
+=======
+CREATE TABLE `telemetria_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` bigint NOT NULL,
   `codigo_raw` bigint NOT NULL,
@@ -306,7 +370,11 @@ CREATE TABLE IF NOT EXISTS `telemetria_bi` (
   `criado_em` datetime(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3))
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `estoque_produto_bi` (
+=======
+CREATE TABLE `estoque_produto_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo_produto` int NOT NULL,
@@ -328,7 +396,11 @@ CREATE TABLE IF NOT EXISTS `estoque_produto_bi` (
   `data_processamento` datetime NOT NULL
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `estoque_empresa_bi` (
+=======
+CREATE TABLE `estoque_empresa_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo_produto` int NOT NULL,
@@ -346,7 +418,11 @@ CREATE TABLE IF NOT EXISTS `estoque_empresa_bi` (
   `data_processamento` datetime NOT NULL
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `estoque_modelo_veiculo_bi` (
+=======
+CREATE TABLE `estoque_modelo_veiculo_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo_produto` int NOT NULL,
@@ -355,7 +431,11 @@ CREATE TABLE IF NOT EXISTS `estoque_modelo_veiculo_bi` (
   `data_processamento` datetime NOT NULL
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `estoque_precos_bi` (
+=======
+CREATE TABLE `estoque_precos_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo_produto` int NOT NULL,
@@ -374,13 +454,21 @@ CREATE TABLE IF NOT EXISTS `estoque_precos_bi` (
   `data_processamento` datetime NOT NULL
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `email_bi` (
+=======
+CREATE TABLE `email_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `pessoa_id` int NOT NULL,
   `email` varchar(500)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `endereco_bi` (
+=======
+CREATE TABLE `endereco_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `pessoa_id` int NOT NULL,
   `rua` varchar(255),
@@ -392,19 +480,31 @@ CREATE TABLE IF NOT EXISTS `endereco_bi` (
   `cep` varchar(10)
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `empresa_bi` (
+=======
+CREATE TABLE `empresa_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `codigo_empresa` int PRIMARY KEY,
   `nome_empresa` varchar(255) NOT NULL
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `tenant` (
+=======
+CREATE TABLE `tenant` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `nome` varchar(120) NOT NULL,
   `slug` varchar(60) NOT NULL,
   `ativo` tinyint(1) NOT NULL DEFAULT '1'
 );
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `financeiro_bi` (
+=======
+CREATE TABLE `financeiro_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `id` bigint PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` int NOT NULL,
   `codigo_raw` int UNIQUE NOT NULL,
@@ -441,7 +541,11 @@ CREATE TABLE IF NOT EXISTS `financeiro_bi` (
   `atualizado_em` datetime DEFAULT (CURRENT_TIMESTAMP)
 );
 
+<<<<<<< HEAD
   CREATE TABLE IF NOT EXISTS `recebimentos_bi` (
+=======
+  CREATE TABLE `recebimentos_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
     `id` int PRIMARY KEY AUTO_INCREMENT,
     `tenant_id` int,
     `codigo_raw` bigint,
@@ -581,7 +685,11 @@ ALTER TABLE `chamados_apoio_bi` ADD FOREIGN KEY (`departamento_id`) REFERENCES `
 
 ALTER TABLE `chamados_etiqueta_bi` ADD FOREIGN KEY (`etiqueta_id`) REFERENCES `dim_etiqueta` (`etiqueta_id`);
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_chamados_bi` (
+=======
+CREATE TABLE `pessoa_bi_chamados_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sults` int,
   `chamados_bi_solicitante_id` int,
   PRIMARY KEY (`pessoa_bi_id_sults`, `chamados_bi_solicitante_id`)
@@ -592,7 +700,11 @@ ALTER TABLE `pessoa_bi_chamados_bi` ADD FOREIGN KEY (`pessoa_bi_id_sults`) REFER
 ALTER TABLE `pessoa_bi_chamados_bi` ADD FOREIGN KEY (`chamados_bi_solicitante_id`) REFERENCES `chamados_bi` (`solicitante_id`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_chamados_bi(1)` (
+=======
+CREATE TABLE `pessoa_bi_chamados_bi(1)` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sults` int,
   `chamados_bi_responsavel_id` int,
   PRIMARY KEY (`pessoa_bi_id_sults`, `chamados_bi_responsavel_id`)
@@ -603,7 +715,11 @@ ALTER TABLE `pessoa_bi_chamados_bi(1)` ADD FOREIGN KEY (`pessoa_bi_id_sults`) RE
 ALTER TABLE `pessoa_bi_chamados_bi(1)` ADD FOREIGN KEY (`chamados_bi_responsavel_id`) REFERENCES `chamados_bi` (`responsavel_id`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_chamados_apoio_bi` (
+=======
+CREATE TABLE `pessoa_bi_chamados_apoio_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sults` int,
   `chamados_apoio_bi_pessoa_id` int,
   PRIMARY KEY (`pessoa_bi_id_sults`, `chamados_apoio_bi_pessoa_id`)
@@ -616,7 +732,11 @@ ALTER TABLE `pessoa_bi_chamados_apoio_bi` ADD FOREIGN KEY (`chamados_apoio_bi_pe
 
 ALTER TABLE `pos_venda_bi` ADD FOREIGN KEY (`codigo_veiculo`) REFERENCES `veiculo_bi` (`codigo_sances`);
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_pos_venda_bi` (
+=======
+CREATE TABLE `pessoa_bi_pos_venda_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sances` int,
   `pos_venda_bi_codigo_consultor` bigint,
   PRIMARY KEY (`pessoa_bi_id_sances`, `pos_venda_bi_codigo_consultor`)
@@ -627,7 +747,11 @@ ALTER TABLE `pessoa_bi_pos_venda_bi` ADD FOREIGN KEY (`pessoa_bi_id_sances`) REF
 ALTER TABLE `pessoa_bi_pos_venda_bi` ADD FOREIGN KEY (`pos_venda_bi_codigo_consultor`) REFERENCES `pos_venda_bi` (`codigo_consultor`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_pos_venda_bi(1)` (
+=======
+CREATE TABLE `pessoa_bi_pos_venda_bi(1)` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sances` int,
   `pos_venda_bi_codigo_usuario_insercao` bigint,
   PRIMARY KEY (`pessoa_bi_id_sances`, `pos_venda_bi_codigo_usuario_insercao`)
@@ -638,7 +762,11 @@ ALTER TABLE `pessoa_bi_pos_venda_bi(1)` ADD FOREIGN KEY (`pessoa_bi_id_sances`) 
 ALTER TABLE `pessoa_bi_pos_venda_bi(1)` ADD FOREIGN KEY (`pos_venda_bi_codigo_usuario_insercao`) REFERENCES `pos_venda_bi` (`codigo_usuario_insercao`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_pos_venda_bi(2)` (
+=======
+CREATE TABLE `pessoa_bi_pos_venda_bi(2)` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sances` int,
   `pos_venda_bi_codigo_usuario_alteracao` bigint,
   PRIMARY KEY (`pessoa_bi_id_sances`, `pos_venda_bi_codigo_usuario_alteracao`)
@@ -649,7 +777,11 @@ ALTER TABLE `pessoa_bi_pos_venda_bi(2)` ADD FOREIGN KEY (`pessoa_bi_id_sances`) 
 ALTER TABLE `pessoa_bi_pos_venda_bi(2)` ADD FOREIGN KEY (`pos_venda_bi_codigo_usuario_alteracao`) REFERENCES `pos_venda_bi` (`codigo_usuario_alteracao`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_pos_venda_bi(3)` (
+=======
+CREATE TABLE `pessoa_bi_pos_venda_bi(3)` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sances` int,
   `pos_venda_bi_codigo_usuario_fechamento` bigint,
   PRIMARY KEY (`pessoa_bi_id_sances`, `pos_venda_bi_codigo_usuario_fechamento`)
@@ -660,7 +792,11 @@ ALTER TABLE `pessoa_bi_pos_venda_bi(3)` ADD FOREIGN KEY (`pessoa_bi_id_sances`) 
 ALTER TABLE `pessoa_bi_pos_venda_bi(3)` ADD FOREIGN KEY (`pos_venda_bi_codigo_usuario_fechamento`) REFERENCES `pos_venda_bi` (`codigo_usuario_fechamento`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_pos_venda_bi(4)` (
+=======
+CREATE TABLE `pessoa_bi_pos_venda_bi(4)` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sances` int,
   `pos_venda_bi_codigo_usuario_cancelamento` bigint,
   PRIMARY KEY (`pessoa_bi_id_sances`, `pos_venda_bi_codigo_usuario_cancelamento`)
@@ -671,7 +807,11 @@ ALTER TABLE `pessoa_bi_pos_venda_bi(4)` ADD FOREIGN KEY (`pessoa_bi_id_sances`) 
 ALTER TABLE `pessoa_bi_pos_venda_bi(4)` ADD FOREIGN KEY (`pos_venda_bi_codigo_usuario_cancelamento`) REFERENCES `pos_venda_bi` (`codigo_usuario_cancelamento`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_pos_venda_bi(5)` (
+=======
+CREATE TABLE `pessoa_bi_pos_venda_bi(5)` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sances` int,
   `pos_venda_bi_codigo_cliente` bigint,
   PRIMARY KEY (`pessoa_bi_id_sances`, `pos_venda_bi_codigo_cliente`)
@@ -682,7 +822,11 @@ ALTER TABLE `pessoa_bi_pos_venda_bi(5)` ADD FOREIGN KEY (`pessoa_bi_id_sances`) 
 ALTER TABLE `pessoa_bi_pos_venda_bi(5)` ADD FOREIGN KEY (`pos_venda_bi_codigo_cliente`) REFERENCES `pos_venda_bi` (`codigo_cliente`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_pos_venda_bi(6)` (
+=======
+CREATE TABLE `pessoa_bi_pos_venda_bi(6)` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sances` int,
   `pos_venda_bi_codigo_empresa` bigint,
   PRIMARY KEY (`pessoa_bi_id_sances`, `pos_venda_bi_codigo_empresa`)
@@ -693,7 +837,11 @@ ALTER TABLE `pessoa_bi_pos_venda_bi(6)` ADD FOREIGN KEY (`pessoa_bi_id_sances`) 
 ALTER TABLE `pessoa_bi_pos_venda_bi(6)` ADD FOREIGN KEY (`pos_venda_bi_codigo_empresa`) REFERENCES `pos_venda_bi` (`codigo_empresa`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pessoa_bi_pos_venda_bi(7)` (
+=======
+CREATE TABLE `pessoa_bi_pos_venda_bi(7)` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pessoa_bi_id_sances` int,
   `pos_venda_bi_codigo_proprietario` bigint,
   PRIMARY KEY (`pessoa_bi_id_sances`, `pos_venda_bi_codigo_proprietario`)
@@ -704,7 +852,11 @@ ALTER TABLE `pessoa_bi_pos_venda_bi(7)` ADD FOREIGN KEY (`pessoa_bi_id_sances`) 
 ALTER TABLE `pessoa_bi_pos_venda_bi(7)` ADD FOREIGN KEY (`pos_venda_bi_codigo_proprietario`) REFERENCES `pos_venda_bi` (`codigo_proprietario`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `chamados_bi_chamados_etiqueta_bi` (
+=======
+CREATE TABLE `chamados_bi_chamados_etiqueta_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `chamados_bi_codigo_raw` int,
   `chamados_etiqueta_bi_chamado_codigo` int,
   PRIMARY KEY (`chamados_bi_codigo_raw`, `chamados_etiqueta_bi_chamado_codigo`)
@@ -715,7 +867,11 @@ ALTER TABLE `chamados_bi_chamados_etiqueta_bi` ADD FOREIGN KEY (`chamados_bi_cod
 ALTER TABLE `chamados_bi_chamados_etiqueta_bi` ADD FOREIGN KEY (`chamados_etiqueta_bi_chamado_codigo`) REFERENCES `chamados_etiqueta_bi` (`chamado_codigo`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `chamados_bi_chamados_apoio_bi` (
+=======
+CREATE TABLE `chamados_bi_chamados_apoio_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `chamados_bi_codigo_raw` int,
   `chamados_apoio_bi_chamado_codigo` int,
   PRIMARY KEY (`chamados_bi_codigo_raw`, `chamados_apoio_bi_chamado_codigo`)
@@ -726,7 +882,11 @@ ALTER TABLE `chamados_bi_chamados_apoio_bi` ADD FOREIGN KEY (`chamados_bi_codigo
 ALTER TABLE `chamados_bi_chamados_apoio_bi` ADD FOREIGN KEY (`chamados_apoio_bi_chamado_codigo`) REFERENCES `chamados_apoio_bi` (`chamado_codigo`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `veiculo_bi_telemetria_bi` (
+=======
+CREATE TABLE `veiculo_bi_telemetria_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `veiculo_bi_codigo_econnect` bigint,
   `telemetria_bi_veiculo_id` bigint,
   PRIMARY KEY (`veiculo_bi_codigo_econnect`, `telemetria_bi_veiculo_id`)
@@ -737,7 +897,11 @@ ALTER TABLE `veiculo_bi_telemetria_bi` ADD FOREIGN KEY (`veiculo_bi_codigo_econn
 ALTER TABLE `veiculo_bi_telemetria_bi` ADD FOREIGN KEY (`telemetria_bi_veiculo_id`) REFERENCES `telemetria_bi` (`veiculo_id`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `motivo_cancelamento_pos_venda_peca_bi` (
+=======
+CREATE TABLE `motivo_cancelamento_pos_venda_peca_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `motivo_cancelamento_codigo` bigint,
   `pos_venda_peca_bi_codigo_motivo_cancelamento` bigint,
   PRIMARY KEY (`motivo_cancelamento_codigo`, `pos_venda_peca_bi_codigo_motivo_cancelamento`)
@@ -748,7 +912,11 @@ ALTER TABLE `motivo_cancelamento_pos_venda_peca_bi` ADD FOREIGN KEY (`motivo_can
 ALTER TABLE `motivo_cancelamento_pos_venda_peca_bi` ADD FOREIGN KEY (`pos_venda_peca_bi_codigo_motivo_cancelamento`) REFERENCES `pos_venda_peca_bi` (`codigo_motivo_cancelamento`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `motivo_cancelamento_pos_venda_servico_bi` (
+=======
+CREATE TABLE `motivo_cancelamento_pos_venda_servico_bi` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `motivo_cancelamento_codigo` bigint,
   `pos_venda_servico_bi_codigo_motivo_cancelamento` bigint,
   PRIMARY KEY (`motivo_cancelamento_codigo`, `pos_venda_servico_bi_codigo_motivo_cancelamento`)
@@ -759,7 +927,11 @@ ALTER TABLE `motivo_cancelamento_pos_venda_servico_bi` ADD FOREIGN KEY (`motivo_
 ALTER TABLE `motivo_cancelamento_pos_venda_servico_bi` ADD FOREIGN KEY (`pos_venda_servico_bi_codigo_motivo_cancelamento`) REFERENCES `pos_venda_servico_bi` (`codigo_motivo_cancelamento`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_bi_condicao_pagamento` (
+=======
+CREATE TABLE `pos_venda_bi_condicao_pagamento` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pos_venda_bi_codigo_condicao_pagamento` bigint,
   `condicao_pagamento_codigo` bigint,
   PRIMARY KEY (`pos_venda_bi_codigo_condicao_pagamento`, `condicao_pagamento_codigo`)
@@ -770,7 +942,11 @@ ALTER TABLE `pos_venda_bi_condicao_pagamento` ADD FOREIGN KEY (`pos_venda_bi_cod
 ALTER TABLE `pos_venda_bi_condicao_pagamento` ADD FOREIGN KEY (`condicao_pagamento_codigo`) REFERENCES `condicao_pagamento` (`codigo`);
 
 
+<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS `pos_venda_bi_tipo_os` (
+=======
+CREATE TABLE `pos_venda_bi_tipo_os` (
+>>>>>>> 384ade6949d04b3032f63caeac7b011423c068df
   `pos_venda_bi_codigo_tipo_os` bigint,
   `tipo_os_codigo` bigint,
   PRIMARY KEY (`pos_venda_bi_codigo_tipo_os`, `tipo_os_codigo`)

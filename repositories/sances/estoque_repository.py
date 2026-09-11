@@ -283,8 +283,7 @@ def salvar_pagina_raw(
 
 # ── Leitura para a Silver ────────────────────────────────────
 
-
-def buscar_produtos_pendentes(tenant_id: int, limite: int = 500) -> list[dict]:
+def buscar_produtos_pendentes(tenant_id: int, pipeline: str, limite: int = 500) -> list[dict]:
     conn = connection_mysql()
     cursor = conn.cursor(dictionary=True)
     cursor.execute(
@@ -294,7 +293,7 @@ def buscar_produtos_pendentes(tenant_id: int, limite: int = 500) -> list[dict]:
         ORDER BY id
         LIMIT %s
         """,
-        (tenant_id, limite),
+        (tenant_id, pipeline, limite),
     )
     linhas = cursor.fetchall()
     cursor.close()

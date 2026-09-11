@@ -131,56 +131,36 @@ def _extrair_recebimentos(
 
     for indice, r in enumerate(recebimentos):
 
-        # ==========================================
-        # RECEBIMENTO NULL / INVÁLIDO
-        # ==========================================
-        if r is None:
-            continue
+            # ==========================================
+            # ERRO HTTP DEFINITIVO
+            # ==========================================
+            logger.error(
+                f"[{origem}] Erro HTTP {response.status_code} na página {offset}: "
+                f"{response.text[:300]}"
+            )
+            salvar_offset(tenant_id, origem, offset)
+            return None
 
-        if not isinstance(r, dict):
-            continue
+        except Timeout:
+            logger.warning(f"[{origem}] Timeout na página {offset}. Aguardando 5s e tentando de novo...")
+            time.sleep(5)
 
-        codigo = r.get("codigo")
+        except ConnectionError:
+            logger.warning(f"[{origem}] Erro de conexão na página {offset}. Aguardando 5s...")
+            time.sleep(5)
 
-        if not codigo:
-            continue
+        except RequestException as e:
+            logger.error(f"[{origem}] Erro de request inesperado na página {offset}: {e}")
+            time.sleep(5)
 
-        linhas.append({
-            "tenant_id": tenant_id,
-            "id": codigo,
-            "codigo_titulo": codigo_titulo,
-            "codigo_tipo_movimentacao": r.get(
-                "codigo_tipo_movimentacao"
-            ),
-            "descricao_tipo_movimentacao": r.get(
-                "descricao_tipo_movimentacao"
-            ),
-            "valor_pago": r.get("valor_pago"),
-            "valor_nominal": r.get("valor_nominal"),
-            "data_movimentacao": _converter_data(
-                r.get("data_movimentacao")
-            ),
-            "data_alteracao": data_alteracao_titulo,
-            "codigo_conta": r.get("codigo_conta"),
-            "descricao_conta": r.get("descricao_conta"),
-            "historico": r.get("historico"),
-            "data_conciliacao": _converter_data(
-                r.get("data_conciliacao")
-            ),
-            "codigo_caixa": r.get("codigo_caixa"),
-            "codigo_cheque_terceiro": r.get(
-                "codigo_cheque_terceiro"
-            ),
-            "codigo_pagamento_cartao": r.get(
-                "codigo_pagamento_cartao"
-            ),
-            "desconto": r.get("desconto"),
-            "acrescimo": r.get("acrescimo"),
-            "juros": r.get("juros"),
-            "multa": r.get("multa"),
-        })
+    try:
+        dados = response.json().get("dados", [])
+        return dados
+    except Exception as e:
+        logger.error(f"[{origem}] Erro ao parsear JSON da página {offset}: {e}")
+        salvar_offset(tenant_id, origem, offset)
+        return None
 
-    return linhas
 
 # ==========================================
 # INTERFACE PÚBLICA
@@ -194,62 +174,82 @@ def extrair_financeiro_sances(
     offset_inicial: int | None = None,
     filtros: dict | None = None,
 ) -> dict:
-    headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
-    extra_params = filtros or {}
+    params_extra: dict = extra_params.copy() if extra_params else {}
 
-    def _persistir_pagina(
-        itens: list[dict],
-        offset: int,
-        limit_usado: int
-    ) -> None:
+    if data_vencimento_inicial:
+        params_extra["data_vencimento_inicial"] = data_vencimento_inicial
+        logger.info(f"[{origem}] Filtro data_vencimento_inicial: {data_vencimento_inicial}")
 
-        titulos_filtrados = []
-        recebimentos_para_salvar = []
+    if data_vencimento_final:
+        params_extra["data_vencimento_final"] = data_vencimento_final
+        logger.info(f"[{origem}] Filtro data_vencimento_final: {data_vencimento_final}")
 
-        for indice, item in enumerate(itens):
+    if data_insercao_inicial:
+        params_extra["data_insercao_inicial"] = data_insercao_inicial
+        logger.info(f"[{origem}] Filtro data_insercao_inicial: {data_insercao_inicial}")
 
-            if not isinstance(item, dict):
-                continue
+    if data_insercao_final:
+        params_extra["data_insercao_final"] = data_insercao_final
+        logger.info(f"[{origem}] Filtro data_insercao_final: {data_insercao_final}")
 
-            codigo_titulo = item.get("codigo")
+    if codigo_situacao:
+        params_extra["codigo_situacao"] = codigo_situacao
+        logger.info(f"[{origem}] Filtro de situacao: {codigo_situacao}")
 
-            if not codigo_titulo:
-                continue
+    offset = ler_offset(tenant_id, origem, offset_inicial, valor_padrao=1)
 
-            try:
-                recebimentos = _extrair_recebimentos(
-                    item,
-                    codigo_titulo,
-                    tenant_id
-                )
+    todos_registros: list[dict] = []
+    status = "ERRO"  # assume erro até provar o contrário
 
-                recebimentos_para_salvar.extend(recebimentos)
+    while True:
+        try:
+            dados = _fetch_page(
+                limit=limit,
+                offset=offset,
+                tenant_id=tenant_id,
+                origem=origem,
+                extra_params=params_extra if params_extra else None,
+            )
+        except RateLimitAtingido:
+            logger.warning(
+                f"[{origem}] Extração interrompida por rate limit. "
+                f"Retornando {len(todos_registros)} registros já coletados."
+            )
+            status = "RATE_LIMIT"
+            break
 
-                filtrado = _filtrar_item(item)
+        # FALHA DEFINITIVA NA API
+        if dados is None:
+            logger.warning(
+                f"[{origem}] Extração encerrada com falha. "
+                "Execute novamente para retomar do ponto de parada."
+            )
+            status = "ERRO"
+            break
 
-                filtrado["tenant_id"] = tenant_id
+        # FIM DOS DADOS
+        if not dados:
+            logger.info(
+                f"[{origem}] Página {offset} veio vazia (situacao={codigo_situacao}) — fim dos registros. "
+                f"Total extraído: {len(todos_registros)} registros."
+            )
+            status = "CONCLUIDO"
+            resetar_offset(tenant_id, origem, valor_padrao=1)
+            break
 
-                titulos_filtrados.append(filtrado)
+        logger.info(f"[{origem}] Página {offset} (situacao={codigo_situacao}): {len(dados)} registros recebidos.")
 
-            except Exception:
-                raise
+        for item in dados:
+            filtrado = _filtrar_item(item)
+            if filtrado.get("codigo"):
+                todos_registros.append(filtrado)
 
-        salvar_pagina_raw(
-            tenant_id=tenant_id,
-            itens=titulos_filtrados,
-            recebimentos=recebimentos_para_salvar,
-        )
+        salvar_offset(tenant_id, origem, offset)
+        time.sleep(SLEEP_REQUEST)
+        offset += 1
 
-    return extrair_paginado_sem_filtro(
-        url=URL_SANCES_FINANCEIRO,
-        headers=headers,
-        origem=origem,
-        tenant_id=tenant_id,
-        on_page=_persistir_pagina,
-        logger=logger,
-        limit=limit,
-        offset_inicial=offset_inicial,
-        extra_params=extra_params,
-        timeout=REQUEST_TIMEOUT,
-        sleep_request=SLEEP_REQUEST,
+    logger.info(
+        f"[{origem}] Extração finalizada | situacao={codigo_situacao} | "
+        f"registros={len(todos_registros)} | status={status}"
     )
+    return {"registros": todos_registros, "status": status}
