@@ -122,7 +122,8 @@ def extrair_paginado(
     # logger.info(f"[{origem}] Extração finalizada | tenant={tenant_id} | registros={len(todos_registros)}")
     return todos_registros
 
-def extrair_paginado_estoque(
+
+def extrair_paginado_sem_filtro(
     url: str,
     headers: dict,
     origem: str,
@@ -148,24 +149,22 @@ def extrair_paginado_estoque(
         try:
             dados = _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger)
         except RateLimitAtingido:
-            logger.warning(f"[{origem}] Extração interrompida por rate limit na página {offset}.")
-            return {"paginas": paginas, "registros": total_registros, "status": "RATE_LIMIT"}
 
-        if dados is None:
-            logger.warning(f"[{origem}] Extração encerrada com falha na página {offset}. Offset NÃO avançado.")
             #logger.warning(f"[{origem}] Extração interrompida por rate limit na página {offset}.")
             return {"paginas": paginas, "registros": total_registros, "status": "RATE_LIMIT"}
 
         if dados is None:
             # logger.warning(f"[{origem}] Extração encerrada com falha na página {offset}. Offset NÃO avançado.")
+
             return {"paginas": paginas, "registros": total_registros, "status": "ERRO"}
 
         qtd = len(dados)
 
         # Fim da paginação: página sem registros.
         if qtd == 0:
-            logger.info(f"[{origem}] Página {offset} vazia — fim dos registros. Total: {total_registros}")
+
             # logger.info(f"[{origem}] Página {offset} vazia — fim dos registros. Total: {total_registros}")
+
             resetar_offset(tenant_id, origem, valor_padrao=valor_padrao_pagina)
             return {"paginas": paginas, "registros": total_registros, "status": "CONCLUIDO"}
 
@@ -175,8 +174,8 @@ def extrair_paginado_estoque(
             logger.error(f"[{origem}] Falha ao persistir página {offset} na Bronze: {e}. Offset NÃO avançado.")
             return {"paginas": paginas, "registros": total_registros, "status": "ERRO"}
 
-        logger.info(f"[{origem}] Página {offset}: {qtd} registros persistidos na Bronze.")
         # logger.info(f"[{origem}] Página {offset}: {qtd} registros persistidos na Bronze.")
+
         paginas += 1
         total_registros += qtd
 

@@ -14,8 +14,8 @@ def extrair_pos_venda_sances(
     limit: int = 100,
     offset_inicial: int | None = None,
     filtros: dict | None = None,
-) -> dict:
-    headers = {"Authorization": f"Bearer {token or 'SANCES_TOKEN'}"}
+) -> dict
+    headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
     extra_params = filtros or {}
 
     def _persistir_pagina(itens: list[dict], offset: int, limit_usado: int) -> None:
