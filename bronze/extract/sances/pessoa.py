@@ -27,7 +27,7 @@ def extrair_pessoa_sances(
     offset_inicial: int | None = None,
     quantidade_por_execucao: int = 5000,
 ) -> dict:
-    headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
+    headers = {"Authorization": f"Bearer {token or 'SANCES_TOKEN'}"}
     def _persistir_registro(item: dict, codigo: int) -> None:
         filtrado = _filtrar_item(item)
         if not filtrado.get("codigo_cliente"):

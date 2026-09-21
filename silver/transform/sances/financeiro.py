@@ -134,7 +134,7 @@ def transformar_recebimentos(registros_raw: list[dict], tenant_id: int) -> list[
         try:
             bi = {
                 "tenant_id":                   tenant_id,
-                "codigo_raw":                  raw.get("id"),
+                "codigo_raw":                  raw.get("codigo"),
                 "codigo_tipo_movimentacao":    raw.get("codigo_tipo_movimentacao"),
                 "descricao_tipo_movimentacao": raw.get("descricao_tipo_movimentacao"),
                 "valor_pago":                  raw.get("valor_pago"),
@@ -156,6 +156,6 @@ def transformar_recebimentos(registros_raw: list[dict], tenant_id: int) -> list[
             resultado.append(bi)
 
         except Exception as e:
-            logger.error(f"Erro ao transformar recebimento id={raw.get('id')}: {e}")
+            logger.error(f"Erro ao transformar recebimento codigo_raw={raw.get('codigo_raw')}: {e}")
 
     return resultado

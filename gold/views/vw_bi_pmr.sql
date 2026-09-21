@@ -1,7 +1,7 @@
 CREATE OR REPLACE VIEW vw_bi_pmr AS
 
 SELECT
-    r.codigo_titulo                    AS codigo_titulo,
+    r.codigo_raw                    AS codigo_raw,
     r.tenant_id                     AS tenant_id,
 
     r.id_empresa                    AS id_empresa,

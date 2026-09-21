@@ -18,7 +18,7 @@ def extrair_chamados(
 ) -> dict:
 
     headers = {
-        "Authorization": f"{token or SULTS_TOKEN}"
+        "Authorization": f"{token or 'SULTS_TOKEN'}"
     }
 
     extra_params = filtros.copy() if filtros else {}

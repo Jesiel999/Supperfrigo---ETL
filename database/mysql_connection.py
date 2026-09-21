@@ -1,10 +1,12 @@
 import mysql.connector
 from mysql.connector import Error
 from config.settings import DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
+from sqlalchemy.orm import sessionmaker, declarative_base
 import logging
 
 logger = logging.getLogger(__name__)
 
+Base = declarative_base()
 
 def connection_mysql():
     """Retorna uma conexão MySQL com autocommit desativado."""

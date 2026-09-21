@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from database.mysql_connection import connection_mysql
 from auth.router import get_current_user
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 router = APIRouter()
 
@@ -30,3 +30,5 @@ def listar_empresas(current_user: dict = Depends(get_current_user)):
     finally:
         cursor.close()
         conn.close()
+
+

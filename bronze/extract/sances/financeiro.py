@@ -101,7 +101,7 @@ def _filtrar_item(item: dict) -> dict:
 
     return {k: v for k, v in item.items() if k in CAMPOS_PERMITIDOS}
 
-def _extrair_recebimentos(item: dict, codigo_titulo, tenant_id: int) -> list[dict]:
+def _extrair_recebimentos(item: dict, codigo_raw, tenant_id: int) -> list[dict]:
 
     recebimentos = item.get("recebimentos") or []
     
@@ -117,7 +117,7 @@ def _extrair_recebimentos(item: dict, codigo_titulo, tenant_id: int) -> list[dic
             continue
         linhas.append({
             "tenant_id": tenant_id,
-            "codigo_titulo": codigo_titulo,
+            "codigo_raw": codigo_raw,
             "codigo_tipo_movimentacao": r.get("codigo_tipo_movimentacao"),
             "descricao_tipo_movimentacao": r.get("descricao_tipo_movimentacao"),
             "valor_pago": r.get("valor_pago"),
@@ -159,13 +159,13 @@ def extrair_financeiro_sances(
         recebimentos_para_salvar = []
 
         for item in itens:
-            codigo_titulo = item.get("codigo")
-            if not codigo_titulo:
+            codigo = item.get("codigo")
+            if not codigo:
                 continue
 
             # extrai recebimentos ANTES da filtragem (senão _filtrar_item descarta)
             recebimentos_para_salvar.extend(
-                _extrair_recebimentos(item, codigo_titulo, tenant_id)
+                _extrair_recebimentos(item, codigo, tenant_id)
             )
 
             filtrado = _filtrar_item(item)

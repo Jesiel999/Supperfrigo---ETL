@@ -27,7 +27,7 @@ def extrair_pessoa_sults(
     limit: int = 100,
     offset_inicial: int | None = None,
 ) -> dict:
-    headers = {"Authorization": token}
+    headers = {"Authorization": 'token'}
 
     def _persistir_pagina(itens: list[dict], offset: int, limit_usado: int) -> None:
         filtrados = []

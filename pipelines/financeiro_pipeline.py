@@ -5,9 +5,9 @@ from core.step import Step
 from database.mysql_connection import connection_mysql
 from bronze.extract.sances.financeiro import extrair_financeiro_sances
 from silver.transform.sances.financeiro import transformar_financeiro, transformar_recebimentos
-from config.settings import SANCES_TOKEN, URL_SANCES_FINANCEIRO, REQUEST_TIMEOUT, RATE_LIMIT_SLEEP, SLEEP_REQUEST
+from config.settings import URL_SANCES_FINANCEIRO, REQUEST_TIMEOUT, RATE_LIMIT_SLEEP, SLEEP_REQUEST
 from repositories.offset_repository import ler_offset
-from repositories.sances.financeiro_repository import upsert_financeiro_raw, buscar_raw_para_transform, upsert_financeiro_bi, buscar_recebimentos_raw_para_transform, upsert_recebimentos_bi
+from repositories.sances.financeiro_repository import buscar_raw_para_transform, upsert_financeiro_bi, buscar_recebimentos_raw_para_transform, upsert_recebimentos_bi
 from repositories.tenant_repository import buscar_token_por_nome
 
 logger = logging.getLogger(__name__)
@@ -53,28 +53,52 @@ class StepExtrairFinanceiro(Step):
 
 
 class StepTransformarFinanceiro(Step):
-    """Silver: lê raw do tenant, transforma, grava em financeiro_bi e recebimentos_bi."""
 
     def __init__(self):
         super().__init__("TransformarFinanceiro")
 
     def execute(self, context: dict) -> dict:
+
         tenant_id = context["tenant_id"]
 
-        # Títulos
+        # =====================================================
+        # FINANCEIRO
+        # =====================================================
+
         registros_raw = buscar_raw_para_transform()
-        registros_bi = transformar_financeiro(registros_raw, tenant_id=tenant_id)
+
+        registros_bi = transformar_financeiro(
+            registros_raw,
+            tenant_id=tenant_id
+        )
+
         resultado = upsert_financeiro_bi(registros_bi)
+
         context["silver_financeiro_resultado"] = resultado
 
-        # Recebimentos
-        recebimentos_raw = buscar_recebimentos_raw_para_transform()
-        recebimentos_bi = transformar_recebimentos(recebimentos_raw, tenant_id=tenant_id)
-        resultado_recebimentos = upsert_recebimentos_bi(recebimentos_bi)
-        context["silver_recebimentos_resultado"] = resultado_recebimentos
+        # =====================================================
+        # RECEBIMENTOS
+        # =====================================================
+
+        recebimentos_raw = buscar_recebimentos_raw_para_transform(
+            tenant_id=tenant_id
+        )
+
+        recebimentos_bi = transformar_recebimentos(
+            recebimentos_raw,
+            tenant_id=tenant_id
+        )
+
+        resultado_recebimentos = upsert_recebimentos_bi(
+            recebimentos_bi
+        )
+
+        context["silver_recebimentos_resultado"] = (
+            resultado_recebimentos
+        )
 
         return context
-
+        
 # ── Interface pública ─────────────────────────────────────────
 
 def executar_pipeline_financeiro(

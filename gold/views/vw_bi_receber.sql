@@ -19,11 +19,34 @@ VIEW `vw_bi_receber` AS
         `f`.`dias_atraso` AS `dias_atraso`,
         `f`.`status_financeiro` AS `status_financeiro`,
         `f`.`descricao_situacao` AS `descricao_situacao`,
-        `ppo`.`ultima_atualizacao` AS `ultima_atualizacao`
+        (CASE
+            WHEN (UPPER(`f`.`descricao_situacao`) IN ('BAIXADO' , 'BAIXADO PARCIAL')) THEN `r`.`valor_pago_total`
+            ELSE NULL
+        END) AS `valor_pago`,
+        (CASE
+            WHEN (UPPER(`f`.`descricao_situacao`) IN ('BAIXADO' , 'BAIXADO PARCIAL')) THEN `r`.`data_movimentacao`
+            ELSE NULL
+        END) AS `data_movimentacao`,
+        `ppo`.`ultima_atualizacao` AS `ultima_atualizacao`,
+        COALESCE(`r`.`desconto`, 0) AS `desconto`,
+        COALESCE(`r`.`acrescimo`, 0) AS `acrescimo`,
+        COALESCE(`r`.`juros`, 0) AS `juros`,
+        COALESCE(`r`.`multa`, 0) AS `multa`
     FROM
-        (((`financeiro_bi` `f`
+        ((((`financeiro_bi` `f`
         LEFT JOIN `empresa_bi` `e` ON ((`e`.`codigo_empresa` = `f`.`id_empresa`)))
         LEFT JOIN `pessoa_bi` `p` ON ((`p`.`id_sances` = `f`.`id_pessoa`)))
+        LEFT JOIN (SELECT 
+            `recebimentos_bi`.`codigo_raw` AS `codigo_raw`,
+                SUM(`recebimentos_bi`.`valor_pago`) AS `valor_pago_total`,
+                MAX(`recebimentos_bi`.`data_movimentacao`) AS `data_movimentacao`,
+                SUM(COALESCE(`recebimentos_bi`.`desconto`, 0)) AS `desconto`,
+                SUM(COALESCE(`recebimentos_bi`.`acrescimo`, 0)) AS `acrescimo`,
+                SUM(COALESCE(`recebimentos_bi`.`juros`, 0)) AS `juros`,
+                SUM(COALESCE(`recebimentos_bi`.`multa`, 0)) AS `multa`
+        FROM
+            `recebimentos_bi`
+        GROUP BY `recebimentos_bi`.`codigo_raw`) `r` ON ((`r`.`codigo_raw` = `f`.`codigo_raw`)))
         LEFT JOIN (SELECT 
             `pipeline_offset`.`tenant_id` AS `tenant_id`,
                 MAX(`pipeline_offset`.`ultima_execucao`) AS `ultima_atualizacao`

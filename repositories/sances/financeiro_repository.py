@@ -183,11 +183,6 @@ def upsert_financeiro_raw(registros: list[dict]) -> dict:
 
                 erros += 1
 
-                logger.error(
-                    "Erro upsert financeiro_raw "
-                    f"codigo={codigo}: {e}"
-                )
-
             # ------------------------------------------------
             # Commit em lote
             # ------------------------------------------------
@@ -235,9 +230,9 @@ def upsert_financeiro_recebimento_raw(registros: list[dict]) -> dict:
 
         for i, item in enumerate(registros, start=1):
 
-            codigo_titulo = item.get("codigo_titulo")
+            codigo = item.get("codigo")
 
-            if not codigo_titulo:
+            if not codigo:
                 ignorados += 1
                 continue
 
@@ -246,7 +241,7 @@ def upsert_financeiro_recebimento_raw(registros: list[dict]) -> dict:
             updates      = [
                 f"{c}=VALUES({c})"
                 for c in colunas
-                if c not in ("codigo_titulo",)
+                if c not in ("codigo",)
             ]
 
             sql = f"""
@@ -275,11 +270,6 @@ def upsert_financeiro_recebimento_raw(registros: list[dict]) -> dict:
                 conn.rollback()
 
                 erros += 1
-
-                logger.error(
-                    "Erro upsert recebimentos_raw "
-                    f"codigo_titulo={codigo_titulo}: {e}"
-                )
 
             # ------------------------------------------------
             # Commit em lote
@@ -370,7 +360,6 @@ def upsert_financeiro_bi(
 
     if not registros:
 
-        logger.warning("upsert_financeiro_bi chamado com lista vazia — nada a gravar.")
         return {"inseridos": 0, "atualizados": 0, "ignorados": 0, "erros": 0}
 
     conn = connection_mysql()
@@ -396,8 +385,6 @@ def upsert_financeiro_bi(
             # ------------------------------------------------
 
             if not codigo_raw:
-
-                #logger.warning(f"Registro sem codigo_raw — ignorado: {item}")
 
                 ignorados += 1
                 continue
@@ -501,11 +488,6 @@ def upsert_financeiro_bi(
 
                 erros += 1
 
-                logger.error(
-                    "Erro upsert financeiro_bi "
-                    f"codigo_raw={codigo_raw}: {e}"
-                )
-
             # ------------------------------------------------
             # Commit em lote
             # ------------------------------------------------
@@ -520,23 +502,17 @@ def upsert_financeiro_bi(
         cursor.close()
         conn.close()
 
-    logger.info(
-        f"financeiro_bi | INSERT={inseridos} UPDATE={atualizados} IGNORADOS={ignorados} ERRO={erros}"
-    )
     return {"inseridos": inseridos, "atualizados": atualizados, "ignorados": ignorados, "erros": erros}
-    return {
-        "inseridos": inseridos,
-        "atualizados": atualizados,
-        "ignorados": ignorados,
-        "erros": erros,
-    }
+
 
 
 # ============================================================
 # BUSCAR RECEBIMENTOS RAW
 # ============================================================
 
-def buscar_recebimentos_raw_para_transform() -> list[dict]:
+def buscar_recebimentos_raw_para_transform(
+    tenant_id: int,
+) -> list[dict]:
 
     conn = connection_mysql()
     cursor = conn.cursor(dictionary=True)
@@ -548,31 +524,125 @@ def buscar_recebimentos_raw_para_transform() -> list[dict]:
             SELECT rr.*
             FROM recebimentos_raw rr
             LEFT JOIN recebimentos_bi rb
-                ON rb.codigo_raw = rr.codigo_titulo
-            WHERE rb.codigo_raw IS NULL
-               OR rr.data_alteracao > rb.atualizado_em
-            ORDER BY rr.codigo_titulo ASC
-            """
+                ON rb.tenant_id = rr.tenant_id
+               AND rb.codigo_raw = rr.codigo
+
+            WHERE rr.tenant_id = %s
+
+              AND (
+                    rb.codigo_raw IS NULL
+
+                    OR rr.data_alteracao > rb.atualizado_em
+
+                    OR (
+                        rr.data_alteracao IS NULL
+                        AND rb.codigo_raw IS NULL
+                    )
+              )
+
+            ORDER BY rr.codigo ASC
+            """,
+            (tenant_id,),
         )
 
-        return cursor.fetchall()
+        registros = cursor.fetchall()
+
+        return registros
 
     finally:
 
         cursor.close()
         conn.close()
 
+# ============================================================
+# TRANSFORMAR RECEBIMENTOS BI
+# ============================================================
+
+
+def transformar_recebimentos(
+    registros: list[dict],
+    tenant_id: int,
+) -> list[dict]:
+
+    resultado = []
+
+    for item in registros:
+
+        codigo = item.get("codigo")
+
+        if codigo is None:
+            continue
+
+        registro = {
+            "tenant_id": tenant_id,
+            "codigo_raw": codigo,
+
+            "codigo_tipo_movimentacao":
+                item.get("codigo_tipo_movimentacao"),
+
+            "descricao_tipo_movimentacao":
+                item.get("descricao_tipo_movimentacao"),
+
+            "valor_pago":
+                item.get("valor_pago"),
+
+            "valor_nominal":
+                item.get("valor_nominal"),
+
+            "data_movimentacao":
+                item.get("data_movimentacao"),
+
+            "codigo_conta":
+                item.get("codigo_conta"),
+
+            "descricao_conta":
+                item.get("descricao_conta"),
+
+            "historico":
+                item.get("historico"),
+
+            "data_conciliacao":
+                item.get("data_conciliacao"),
+
+            "codigo_caixa":
+                item.get("codigo_caixa"),
+
+            "codigo_cheque_terceiro":
+                item.get("codigo_cheque_terceiro"),
+
+            "codigo_pagamento_cartao":
+                item.get("codigo_pagamento_cartao"),
+
+            "desconto":
+                item.get("desconto"),
+
+            "acrescimo":
+                item.get("acrescimo"),
+
+            "juros":
+                item.get("juros"),
+
+            "multa":
+                item.get("multa"),
+
+            "data_alteracao":
+                item.get("data_alteracao"),
+        }
+
+        resultado.append(registro)
+
+    return resultado
 
 # ============================================================
 # RECEBIMENTOS BI
 # ============================================================
-
 
 def upsert_recebimentos_bi(
     registros: list[dict],
 ) -> dict:
 
     if not registros:
+
         return {
             "inseridos": 0,
             "atualizados": 0,
@@ -581,9 +651,7 @@ def upsert_recebimentos_bi(
         }
 
     conn = connection_mysql()
-
-    cursor_select = conn.cursor(dictionary=True)
-    cursor_write = conn.cursor()
+    cursor = conn.cursor()
 
     inseridos = 0
     atualizados = 0
@@ -594,54 +662,28 @@ def upsert_recebimentos_bi(
 
         for i, item in enumerate(registros, start=1):
 
+            tenant_id = item.get("tenant_id")
             codigo_raw = item.get("codigo_raw")
 
-            # ------------------------------------------------
-            # Validação
-            # ------------------------------------------------
+            # =================================================
+            # VALIDAÇÃO
+            # =================================================
 
-            if not codigo_raw:
+            if tenant_id is None:
+
                 ignorados += 1
+
                 continue
 
-            # ------------------------------------------------
-            # Verifica se existe no BI
-            # ------------------------------------------------
+            if codigo_raw is None:
 
-            cursor_select.execute(
-                """
-                SELECT
-                    codigo_raw,
-                    atualizado_em
-                FROM recebimentos_bi
-                WHERE codigo_raw = %s
-                LIMIT 1
-                """,
-                (codigo_raw,),
-            )
+                ignorados += 1
 
-            existente = cursor_select.fetchone()
-
-
-            if existente is None:
-                pass
+                continue
 
             # =================================================
-            # REGISTRO EXISTENTE
+            # COLUNAS
             # =================================================
-
-            if existente:
-
-                houve_alteracao = data_mais_recente(
-                    item.get("data_alteracao"),
-                    existente.get("atualizado_em"),
-                )
-
-                if not houve_alteracao:
-
-                    ignorados += 1
-
-                    continue
 
             colunas = list(item.keys())
 
@@ -653,8 +695,15 @@ def upsert_recebimentos_bi(
             updates = [
                 f"{coluna}=VALUES({coluna})"
                 for coluna in colunas
-                if coluna != "codigo_raw"
+                if coluna not in (
+                    "tenant_id",
+                    "codigo_raw",
+                )
             ]
+
+            # =================================================
+            # UPSERT
+            # =================================================
 
             sql = f"""
                 INSERT INTO recebimentos_bi (
@@ -670,17 +719,25 @@ def upsert_recebimentos_bi(
             try:
 
                 if not conn.is_connected():
+
                     conn.reconnect(
                         attempts=3,
                         delay=5,
                     )
 
-                cursor_write.execute(sql, item)
+                cursor.execute(sql, item)
 
-                if existente:
-                    atualizados += 1
-                else:
+                if cursor.rowcount == 1:
+
                     inseridos += 1
+
+                elif cursor.rowcount == 2:
+
+                    atualizados += 1
+
+                elif cursor.rowcount == 0:
+
+                    ignorados += 1
 
             except Exception as e:
 
@@ -688,12 +745,12 @@ def upsert_recebimentos_bi(
 
                 erros += 1
 
-                logger.error(
-                    "Erro upsert recebimentos_bi "
-                    f"codigo_raw={codigo_raw}: {e}"
-                )
+            # =================================================
+            # COMMIT
+            # =================================================
 
             if i % BATCH_COMMIT == 0:
+
                 conn.commit()
 
         conn.commit()
@@ -702,33 +759,18 @@ def upsert_recebimentos_bi(
 
         conn.rollback()
 
-        logger.exception(
-            "Erro geral no upsert_recebimentos_bi: %s",
-            e,
-        )
-
         raise
 
     finally:
 
-        try:
-            cursor_select.close()
-        except Exception:
-            pass
+        cursor.close()
+        conn.close()    
 
-        try:
-            cursor_write.close()
-        except Exception:
-            pass
-
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-    return {
+    resultado = {
         "inseridos": inseridos,
         "atualizados": atualizados,
         "ignorados": ignorados,
         "erros": erros,
     }
+
+    return resultado

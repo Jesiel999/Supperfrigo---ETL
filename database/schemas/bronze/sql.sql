@@ -390,12 +390,14 @@ CREATE TABLE IF NOT EXISTS `financeiro_raw` (
 
 CREATE TABLE IF NOT EXISTS `recebimentos_raw` (
   `id` int PRIMARY KEY AUTO_INCREMENT,
-  `codigo_titulo` bigint,
+  `tenant_id` int NOT NULL,
+  `codigo_raw` bigint,
   `codigo_tipo_movimentacao` int,
   `descricao_tipo_movimentacao` varchar(30),
   `valor_pago` decimal(15,2),
   `valor_nominal` decimal(15,2),
   `data_movimentacao` date,
+  `data_alteracao` datetime,
   `codigo_conta` int,
   `descricao_conta` varchar(50),
   `historico` TEXT,
@@ -684,4 +686,6 @@ ALTER TABLE `pos_venda_nota_raw` ADD FOREIGN KEY (`tenant_id`) REFERENCES `tenan
 
 ALTER TABLE `pos_venda_parcela_raw` ADD FOREIGN KEY (`tenant_id`) REFERENCES `tenant` (`id`);
 
-ALTER TABLE `recebimentos_raw` ADD FOREIGN KEY (`codigo_titulo`) REFERENCES `financeiro_raw` (`codigo`);
+ALTER TABLE `recebimentos_raw` ADD FOREIGN KEY (`codigo_raw`) REFERENCES `financeiro_raw` (`codigo`);
+
+ALTER TABLE recebimentos_raw ADD CONSTRAINT uk_recebimentos_raw_tenant_codigo UNIQUE (tenant_id, codigo_raw);

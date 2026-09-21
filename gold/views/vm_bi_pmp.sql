@@ -1,7 +1,7 @@
 CREATE OR REPLACE VIEW vw_bi_pmp AS
 
 SELECT
-    pg.codigo_titulo                    AS codigo_titulo,
+    pg.codigo_raw                    AS codigo_raw,
     pg.tenant_id                     AS tenant_id,
 
     pg.id_empresa                    AS id_empresa,
