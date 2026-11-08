@@ -16,7 +16,7 @@ def extrair_estoque_sances(
     offset_inicial: int | None = None,
     filtros: dict | None = None,
 ) -> dict:
-    headers = {"Authorization": f"Bearer {token or 'SANCES_TOKEN'}"}
+    headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
     extra_params = {**FILTROS_DEFAULT, **(filtros or {})}
 
     def _persistir_pagina(itens: list[dict], offset: int, limit_usado: int) -> None:

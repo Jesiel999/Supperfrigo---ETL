@@ -5,9 +5,80 @@ from database.mysql_connection import connection_mysql
 logger = logging.getLogger(__name__)
 
 
+# ── Helper: INSERT ... ON DUPLICATE KEY UPDATE montado a partir das colunas ──
+# Colunas e valores saem da MESMA lista, então os placeholders nunca
+# ficam fora de sincronia com as tuplas.
+
+def _upsert_lote(
+    cursor,
+    tabela: str,
+    colunas: list[str],
+    chaves: tuple,
+    linhas: list[dict],
+) -> None:
+    """
+    chaves: colunas que identificam o registro (unique key) e, por isso,
+            não entram no UPDATE.
+    """
+    if not linhas:
+        return
+
+    colunas_sql = ", ".join(f"`{c}`" for c in colunas)
+    placeholders = ", ".join(["%s"] * len(colunas))
+
+    updates = [
+        f"`{c}` = VALUES(`{c}`)"
+        for c in colunas
+        if c not in chaves
+    ]
+    updates.append("`processado_em` = NULL")
+
+    sql = f"""
+        INSERT INTO `{tabela}` ({colunas_sql})
+        VALUES ({placeholders})
+        ON DUPLICATE KEY UPDATE
+            {", ".join(updates)}
+    """
+
+    valores = [tuple(linha[c] for c in colunas) for linha in linhas]
+    cursor.executemany(sql, valores)
+
+
+COLUNAS_PRODUTO = [
+    "tenant_id", "offset_pagina",
+    "codigo", "descricao", "referencia", "referencia_fabrica",
+    "endereco_setor", "endereco_rua", "endereco_andar",
+    "sigla_unidade_medida", "descricao_unidade_medida",
+    "codigo_categoria", "descricao_categoria",
+    "descricao_grupo", "descricao_subgrupo",
+    "codigo_ean", "codigo_barras", "ativo", "data_extracao",
+]
+
+COLUNAS_PRECO = [
+    "tenant_id", "offset_pagina",
+    "codigo_produto", "codigo_empresa", "cnpj", "nome_razao",
+    "nome_fantasia", "apelido",
+    "custo_medio", "venda_varejo", "venda_atacado", "venda_ecommerce",
+    "garantia", "sugerido", "reposicao", "promocao",
+    "personalizado1", "personalizado3", "data_extracao",
+]
+
+COLUNAS_QUANTIDADE = [
+    "tenant_id", "offset_pagina",
+    "codigo_produto", "codigo_empresa", "cnpj", "nome_razao",
+    "nome_fantasia", "apelido",
+    "qtd_estoque", "qtd_aplicadas", "qtd_reservada",
+    "qtd_transito", "qtd_pedido", "qtd_bo", "data_extracao",
+]
+
+COLUNAS_MODELO = [
+    "tenant_id", "offset_pagina",
+    "codigo_produto", "codigo_modelo", "descricao_modelo", "data_extracao",
+]
+
+
 def salvar_pagina_raw(
     tenant_id: int,
-    pipeline: str,
     offset_pagina: int,
     itens: list[dict],
 ) -> None:
@@ -27,254 +98,120 @@ def salvar_pagina_raw(
         linhas_quantidade = []
         linhas_modelo = []
 
+        base = {
+            "tenant_id": tenant_id,
+            "offset_pagina": offset_pagina,
+            "data_extracao": agora,
+        }
+
         for item in itens:
             codigo = item.get("codigo")
 
             ref_fabrica = item.get("referenciaFabrica")
-            ref_fabrica_str = ";".join(str(r) for r in ref_fabrica if r) if ref_fabrica else None
+            ref_fabrica_str = (
+                ";".join(str(r) for r in ref_fabrica if r) if ref_fabrica else None
+            )
 
-            linhas_produto.append((
-                tenant_id, pipeline, offset_pagina,
-                tenant_id, offset_pagina,
-                codigo, item.get("descricao"), item.get("referencia"), ref_fabrica_str,
-                item.get("endereco_setor"), item.get("endereco_rua"), item.get("endereco_andar"),
-                item.get("siglaUnidadeMedida"), item.get("descricaoUnidadeMedida"),
-                item.get("codigoCategoria"), item.get("descricaoCategoria"),
-                item.get("descricaoGrupo"), item.get("descricaoSubGrupo"),
-                item.get("codigoEAN"), item.get("codigoBarras"), item.get("ativo"),
-                agora,
-            ))
+            linhas_produto.append({
+                **base,
+                "codigo": codigo,
+                "descricao": item.get("descricao"),
+                "referencia": item.get("referencia"),
+                "referencia_fabrica": ref_fabrica_str,
+                "endereco_setor": item.get("endereco_setor"),
+                "endereco_rua": item.get("endereco_rua"),
+                "endereco_andar": item.get("endereco_andar"),
+                "sigla_unidade_medida": item.get("siglaUnidadeMedida"),
+                "descricao_unidade_medida": item.get("descricaoUnidadeMedida"),
+                "codigo_categoria": item.get("codigoCategoria"),
+                "descricao_categoria": item.get("descricaoCategoria"),
+                "descricao_grupo": item.get("descricaoGrupo"),
+                "descricao_subgrupo": item.get("descricaoSubGrupo"),
+                "codigo_ean": item.get("codigoEAN"),
+                "codigo_barras": item.get("codigoBarras"),
+                "ativo": item.get("ativo"),
+            })
 
             for p in (item.get("precos") or []):
-                linhas_preco.append((
-                    tenant_id, pipeline, offset_pagina,
-                    tenant_id, offset_pagina,
-                    codigo, p.get("codigoEmpresa"), p.get("cnpj"), p.get("nomeRazao"),
-                    p.get("nomeFantasia"), p.get("apelido"),
-                    p.get("custoMedio"), p.get("vendaVarejo"), p.get("vendaAtacado"), p.get("vendaEcommerce"),
-                    p.get("garantia"), p.get("sugerido"), p.get("reposicao"), p.get("promocao"),
-                    p.get("personalizado1"), p.get("personalizado3"),
-                    agora,
-                ))
+                linhas_preco.append({
+                    **base,
+                    "codigo_produto": codigo,
+                    "codigo_empresa": p.get("codigoEmpresa"),
+                    "cnpj": p.get("cnpj"),
+                    "nome_razao": p.get("nomeRazao"),
+                    "nome_fantasia": p.get("nomeFantasia"),
+                    "apelido": p.get("apelido"),
+                    "custo_medio": p.get("custoMedio"),
+                    "venda_varejo": p.get("vendaVarejo"),
+                    "venda_atacado": p.get("vendaAtacado"),
+                    "venda_ecommerce": p.get("vendaEcommerce"),
+                    "garantia": p.get("garantia"),
+                    "sugerido": p.get("sugerido"),
+                    "reposicao": p.get("reposicao"),
+                    "promocao": p.get("promocao"),
+                    "personalizado1": p.get("personalizado1"),
+                    "personalizado3": p.get("personalizado3"),
+                })
 
             for e in (item.get("estoque") or []):
-                linhas_quantidade.append((
-                    tenant_id, pipeline, offset_pagina,
-                    tenant_id, offset_pagina,
-                    codigo, e.get("codigoEmpresa"), e.get("cnpj"), e.get("nomeRazao"),
-                    e.get("nomeFantasia"), e.get("apelido"),
-                    e.get("qtdEstoque"), e.get("qtdAplicadas"), e.get("qtdReservada"),
-                    e.get("qtdTransito"), e.get("qtdPedido"), e.get("qtdBO"),
-                    agora,
-                ))
+                linhas_quantidade.append({
+                    **base,
+                    "codigo_produto": codigo,
+                    "codigo_empresa": e.get("codigoEmpresa"),
+                    "cnpj": e.get("cnpj"),
+                    "nome_razao": e.get("nomeRazao"),
+                    "nome_fantasia": e.get("nomeFantasia"),
+                    "apelido": e.get("apelido"),
+                    "qtd_estoque": e.get("qtdEstoque"),
+                    "qtd_aplicadas": e.get("qtdAplicadas"),
+                    "qtd_reservada": e.get("qtdReservada"),
+                    "qtd_transito": e.get("qtdTransito"),
+                    "qtd_pedido": e.get("qtdPedido"),
+                    "qtd_bo": e.get("qtdBO"),
+                })
 
             for m in (item.get("modeloVeiculo") or []):
                 if not m.get("codigoModelo"):
-                    continue  
-                linhas_modelo.append((
-                    tenant_id, pipeline, offset_pagina,
-                    tenant_id, offset_pagina,
-                    codigo, m.get("codigoModelo"), m.get("descricaoModelo"),
-                    agora,
-                ))
+                    continue
+                linhas_modelo.append({
+                    **base,
+                    "codigo_produto": codigo,
+                    "codigo_modelo": m.get("codigoModelo"),
+                    "descricao_modelo": m.get("descricaoModelo"),
+                })
 
-        if linhas_produto:
-            cursor.executemany(
-                """
-                INSERT INTO produto_sances_raw
-                    (
-                        tenant_id,
-                        pipeline,
-                        offset_pagina,
-                        codigo,
-                        descricao,
-                        referencia,
-                        referencia_fabrica,
-                        endereco_setor,
-                        endereco_rua,
-                        endereco_andar,
-                        sigla_unidade_medida,
-                        descricao_unidade_medida,
-                        codigo_categoria,
-                        descricao_categoria,
-                        descricao_grupo,
-                        descricao_subgrupo,
-                        codigo_ean,
-                        codigo_barras,
-                        ativo,
-                        data_extracao
-                    )
-                VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                )
-                ON DUPLICATE KEY UPDATE
-                    pipeline = VALUES(pipeline),
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                )
-                ON DUPLICATE KEY UPDATE
-                    offset_pagina = VALUES(offset_pagina),
-                    descricao = VALUES(descricao),
-                    referencia = VALUES(referencia),
-                    referencia_fabrica = VALUES(referencia_fabrica),
-                    endereco_setor = VALUES(endereco_setor),
-                    endereco_rua = VALUES(endereco_rua),
-                    endereco_andar = VALUES(endereco_andar),
-                    sigla_unidade_medida = VALUES(sigla_unidade_medida),
-                    descricao_unidade_medida = VALUES(descricao_unidade_medida),
-                    codigo_categoria = VALUES(codigo_categoria),
-                    descricao_categoria = VALUES(descricao_categoria),
-                    descricao_grupo = VALUES(descricao_grupo),
-                    descricao_subgrupo = VALUES(descricao_subgrupo),
-                    codigo_ean = VALUES(codigo_ean),
-                    codigo_barras = VALUES(codigo_barras),
-                    ativo = VALUES(ativo),
-                    data_extracao = VALUES(data_extracao),
-                    processado_em = NULL
-                """,
-                linhas_produto,
-            )
+        _upsert_lote(
+            cursor, "produto_sances_raw", COLUNAS_PRODUTO,
+            chaves=("tenant_id", "codigo"),
+            linhas=linhas_produto,
+        )
 
-        if linhas_preco:
-            cursor.executemany(
-                """
-                INSERT INTO preco_sances_raw
-                    (
-                        tenant_id,
-                        pipeline,
-                        offset_pagina,
-                        codigo_produto,
-                        codigo_empresa,
-                        cnpj,
-                        nome_razao,
-                        nome_fantasia,
-                        apelido,
-                        custo_medio,
-                        venda_varejo,
-                        venda_atacado,
-                        venda_ecommerce,
-                        garantia,
-                        sugerido,
-                        reposicao,
-                        promocao,
-                        personalizado1,
-                        personalizado3,
-                        data_extracao
-                    )
-                VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                )
-                ON DUPLICATE KEY UPDATE
-                    pipeline = VALUES(pipeline),
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                )
-                ON DUPLICATE KEY UPDATE
-                    offset_pagina = VALUES(offset_pagina),
-                    cnpj = VALUES(cnpj),
-                    nome_razao = VALUES(nome_razao),
-                    nome_fantasia = VALUES(nome_fantasia),
-                    apelido = VALUES(apelido),
-                    custo_medio = VALUES(custo_medio),
-                    venda_varejo = VALUES(venda_varejo),
-                    venda_atacado = VALUES(venda_atacado),
-                    venda_ecommerce = VALUES(venda_ecommerce),
-                    garantia = VALUES(garantia),
-                    sugerido = VALUES(sugerido),
-                    reposicao = VALUES(reposicao),
-                    promocao = VALUES(promocao),
-                    personalizado1 = VALUES(personalizado1),
-                    personalizado3 = VALUES(personalizado3),
-                    data_extracao = VALUES(data_extracao),
-                    processado_em = NULL
-                """,
-                linhas_preco,
-            )
+        _upsert_lote(
+            cursor, "preco_sances_raw", COLUNAS_PRECO,
+            chaves=("tenant_id", "codigo_produto", "codigo_empresa"),
+            linhas=linhas_preco,
+        )
 
-        if linhas_quantidade:
-            cursor.executemany(
-                """
-                INSERT INTO quantidade_sances_raw
-                    (
-                        tenant_id,
-                        pipeline,
-                        offset_pagina,
-                        codigo_produto,
-                        codigo_empresa,
-                        cnpj,
-                        nome_razao,
-                        nome_fantasia,
-                        apelido,
-                        qtd_estoque,
-                        qtd_aplicadas,
-                        qtd_reservada,
-                        qtd_transito,
-                        qtd_pedido,
-                        qtd_bo,
-                        data_extracao
-                    )
-                VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s
-                )
-                ON DUPLICATE KEY UPDATE
-                    pipeline = VALUES(pipeline),
-                    %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s
-                )
-                ON DUPLICATE KEY UPDATE
-                    offset_pagina = VALUES(offset_pagina),
-                    cnpj = VALUES(cnpj),
-                    nome_razao = VALUES(nome_razao),
-                    nome_fantasia = VALUES(nome_fantasia),
-                    apelido = VALUES(apelido),
-                    qtd_estoque = VALUES(qtd_estoque),
-                    qtd_aplicadas = VALUES(qtd_aplicadas),
-                    qtd_reservada = VALUES(qtd_reservada),
-                    qtd_transito = VALUES(qtd_transito),
-                    qtd_pedido = VALUES(qtd_pedido),
-                    qtd_bo = VALUES(qtd_bo),
-                    data_extracao = VALUES(data_extracao),
-                    processado_em = NULL
-                """,
-                linhas_quantidade,
-            )
+        _upsert_lote(
+            cursor, "quantidade_sances_raw", COLUNAS_QUANTIDADE,
+            chaves=("tenant_id", "codigo_produto", "codigo_empresa"),
+            linhas=linhas_quantidade,
+        )
 
-        if linhas_modelo:
-            cursor.executemany(
-                """
-                INSERT INTO modelo_veiculo_sances_raw
-                    (
-                        tenant_id,
-                        pipeline,
-                        offset_pagina,
-                        codigo_produto,
-                        codigo_modelo,
-                        descricao_modelo,
-                        data_extracao
-                    )
-                VALUES (
-                    %s, %s, %s, %s, %s, %s, %s
-                )
-                ON DUPLICATE KEY UPDATE
-                    pipeline = VALUES(pipeline),
-                    %s, %s, %s, %s, %s, %s
-                )
-                ON DUPLICATE KEY UPDATE
-                    offset_pagina = VALUES(offset_pagina),
-                    descricao_modelo = VALUES(descricao_modelo),
-                    data_extracao = VALUES(data_extracao),
-                    processado_em = NULL
-                """,
-                linhas_modelo,
-            )
+        _upsert_lote(
+            cursor, "modelo_veiculo_sances_raw", COLUNAS_MODELO,
+            chaves=("tenant_id", "codigo_produto", "codigo_modelo"),
+            linhas=linhas_modelo,
+        )
 
         conn.commit()
 
     except Exception:
         conn.rollback()
+        logger.exception(
+            "Erro ao salvar estoque: tenant=%s offset=%s",
+            tenant_id, offset_pagina,
+        )
         raise
     finally:
         cursor.close()
@@ -283,17 +220,19 @@ def salvar_pagina_raw(
 
 # ── Leitura para a Silver ────────────────────────────────────
 
-def buscar_produtos_pendentes(tenant_id: int, pipeline: str, limite: int = 500) -> list[dict]:
+def buscar_produtos_pendentes(tenant_id: int, limite: int = 500) -> list[dict]:
     conn = connection_mysql()
     cursor = conn.cursor(dictionary=True)
     cursor.execute(
         """
-        SELECT * FROM produto_sances_raw
-        WHERE tenant_id = %s AND processado_em IS NULL
+        SELECT *
+        FROM produto_sances_raw
+        WHERE tenant_id = %s
+        AND processado_em IS NULL
         ORDER BY id
         LIMIT %s
         """,
-        (tenant_id, pipeline, limite),
+        (tenant_id, limite),
     )
     linhas = cursor.fetchall()
     cursor.close()

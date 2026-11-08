@@ -152,7 +152,6 @@ def _mais_recente_por_chave(linhas: list[dict], campo_chave: str) -> dict:
 
 def processar_produtos_pendentes(
     tenant_id: int,
-    pipeline: str = "estoque_sances",
     limite: int = 500,
 ) -> dict:
     """
@@ -168,7 +167,7 @@ def processar_produtos_pendentes(
     intencional: mantém a Bronze 100% append-only/auditável sem precisar
     de lógica extra de "qual child pertence a qual execução".
     """
-    pendentes = buscar_produtos_pendentes(tenant_id, pipeline, limite)
+    pendentes = buscar_produtos_pendentes(tenant_id, limite)
     pendentes = buscar_produtos_pendentes(tenant_id, limite)
     if not pendentes:
         return {"processados": 0}
