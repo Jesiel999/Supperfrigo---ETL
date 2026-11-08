@@ -15,16 +15,17 @@ def extrair_pos_venda_sances(
     offset_inicial: int | None = None,
     filtros: dict | None = None,
 ) -> dict:
-    headers = {"Authorization": f"Bearer {token or 'SANCES_TOKEN'}"}
+    headers = {"Authorization": f"Bearer {token or SANCES_TOKEN}"}
     extra_params = filtros or {}
 
     def _persistir_pagina(itens: list[dict], offset: int, limit_usado: int) -> None:
         salvar_pagina_raw(
             tenant_id=tenant_id,
+            pipeline=ORIGEM,
             offset_pagina=offset,
             itens=itens,
         )
-
+        
     return extrair_paginado_sem_filtro(
         url=URL_SANCES_POS_VENDA,
         headers=headers,

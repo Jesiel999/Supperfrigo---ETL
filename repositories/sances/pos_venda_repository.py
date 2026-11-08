@@ -1,393 +1,863 @@
+import hashlib
+import json
 import logging
 from datetime import datetime
+
 from database.mysql_connection import connection_mysql
 
 logger = logging.getLogger(__name__)
 
 
-# ==========================================
-# HELPERS DE DATA
-# ==========================================
+# ============================================================
+# HELPERS
+# ============================================================
 
 def _converter_data_iso(valor) -> datetime | None:
-    """Converte datas ISO com offset, ex: '2026-02-04T17:42:44.000-03:00'."""
+    """Converte datas ISO com offset ou Z para datetime."""
     if not valor:
         return None
+
     try:
-        v = str(valor).strip().replace("Z", "+00:00")
-        return datetime.fromisoformat(v)
-    except Exception:
+        valor = str(valor).strip().replace("Z", "+00:00")
+        return datetime.fromisoformat(valor)
+    except (TypeError, ValueError):
         return None
 
 
 def _converter_data_br(valor) -> str | None:
-    """Converte 'DD/MM/YYYY' (vencimento_parcela) para 'YYYY-MM-DD'."""
+    """Converte DD/MM/YYYY para YYYY-MM-DD."""
     if not valor:
         return None
+
     try:
-        return datetime.strptime(str(valor).strip(), "%d/%m/%Y").strftime("%Y-%m-%d")
-    except Exception:
-        # logger.warning(f"vencimento_parcela em formato inesperado: {valor}")
+        return datetime.strptime(
+            str(valor).strip(), "%d/%m/%Y"
+        ).strftime("%Y-%m-%d")
+    except (TypeError, ValueError):
         return None
 
 
-# ==========================================
-# BRONZE — grava página inteira (pai + filhos)
-# ==========================================
+def _booleano_mysql(valor, padrao=0) -> int:
+    """Normaliza booleanos da API para 0 ou 1."""
+    if valor is None:
+        return padrao
 
-def salvar_pagina_raw(tenant_id: int, offset_pagina: int, itens: list[dict]) -> None:
+    if isinstance(valor, str):
+        return 1 if valor.strip().lower() in (
+            "1", "true", "sim", "s", "yes"
+        ) else 0
+
+    return 1 if valor else 0
+
+
+def _hash_item(item: dict) -> str:
+    """
+    Hash do item inteiro devolvido pela API (principal + filhos).
+    Se o hash não mudou, nada mudou: o item é ignorado.
+    """
+    return hashlib.sha256(
+        json.dumps(
+            item,
+            sort_keys=True,
+            default=str,
+            ensure_ascii=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+# ============================================================
+# BRONZE - TABELA PRINCIPAL
+# ============================================================
+
+CAMPOS_DIRETOS = [
+    "tipo",
+    "descricao_tipo",
+    "numero",
+    "codigo_situacao",
+    "situacao",
+    "codigo_empresa",
+    "nome_empresa",
+    "codigo_cliente",
+    "nome_cliente",
+    "codigo_tipo_preco",
+    "descricao_tipo_preco",
+    "codigo_veiculo",
+    "placa_veiculo",
+    "codigo_modelo_veiculo",
+    "descricao_modelo_veiculo",
+    "codigo_cor_veiculo",
+    "descricao_cor_veiculo",
+    "ano_fabricacao_veiculo",
+    "ano_modelo_veiculo",
+    "codigo_tipo_os",
+    "descricao_tipo_os",
+    "km_entrada",
+    "km_saida",
+    "solicitacao_cliente",
+    "avaria",
+    "defeito_averiguado",
+    "codigo_proprietario",
+    "nome_proprietario",
+    "codigo_tipo_midia",
+    "descricao_tipo_midia",
+    "codigo_modalidade_venda",
+    "descricao_modalidade_venda",
+    "codigo_conveniado",
+    "nome_conveniado",
+    "codigo_consultor",
+    "nome_consultor",
+    "percentual_comissao_peca",
+    "valor_comissao_peca_consultor",
+    "percentual_comissao_servico",
+    "valor_comissao_servico_consultor",
+    "total_comissao_consultor",
+    "observacao",
+    "observacao_nota",
+    "codigo_usuario_insercao",
+    "nome_usuario_insercao",
+    "codigo_usuario_alteracao",
+    "nome_usuario_alteracao",
+    "codigo_usuario_cancelamento",
+    "nome_usuario_cancelamento",
+    "codigo_usuario_fechamento",
+    "nome_usuario_fechamento",
+    "valor_seguro",
+    "valor_frete",
+    "valor_despesas",
+    "valor_acrescimo_financeiro",
+    "total_pecas_bruto",
+    "total_desconto_pecas",
+    "total_pecas_liquido",
+    "total_pecas_custo",
+    "total_pecas_lucro",
+    "total_servicos_bruto",
+    "total_desconto_servicos",
+    "total_servicos_liquido",
+    "total_servicos_custo",
+    "total_servicos_lucro",
+    "total_geral",
+    "codigo_condicao_pagamento",
+    "descricao_condicao_pagamento",
+]
+
+CAMPOS_BOOLEANOS = [
+    "orcamento_os",
+    "aguardando_liberacao",
+]
+
+CAMPOS_DATA_ISO = [
+    "data_entrada",
+    "data_saida",
+    "data_insercao",
+    "data_alteracao",
+    "data_cancelamento",
+    "data_fechamento",
+]
+
+
+def _linha_pos_venda_raw(
+    tenant_id: int,
+    codigo,
+    item: dict,
+    agora: datetime,
+) -> dict:
+
+    linha = {
+        "tenant_id": tenant_id,
+        "codigo": codigo,
+        "atualizado_em": agora,
+        "hash_registro": _hash_item(item),
+    }
+
+    for campo in CAMPOS_DIRETOS:
+        linha[campo] = item.get(campo)
+
+    for campo in CAMPOS_BOOLEANOS:
+        linha[campo] = _booleano_mysql(item.get(campo))
+
+    for campo in CAMPOS_DATA_ISO:
+        linha[campo] = _converter_data_iso(item.get(campo))
+
+    return linha
+
+
+def _hashes_existentes(cursor, tenant_id: int, codigos: list) -> dict:
+    """Hashes já gravados para os códigos da página (1 query por página)."""
+    if not codigos:
+        return {}
+
+    placeholders = ", ".join(["%s"] * len(codigos))
+
+    cursor.execute(
+        f"""
+        SELECT codigo, hash_registro
+        FROM pos_venda_raw
+        WHERE tenant_id = %s
+          AND codigo IN ({placeholders})
+        """,
+        (tenant_id, *codigos),
+    )
+
+    return {codigo: h for codigo, h in cursor.fetchall()}
+
+
+def _upsert_principal(cursor, dados: dict) -> None:
+    """
+    UPSERT do registro principal.
+    Se o hash mudou, processado_em volta para NULL e o silver
+    reprocessa SOMENTE este registro.
+    """
+    colunas = list(dados.keys())
+
+    colunas_sql = ", ".join(f"`{c}`" for c in colunas)
+    placeholders = ", ".join(["%s"] * len(colunas))
+
+    updates = [
+        f"`{c}`=VALUES(`{c}`)"
+        for c in colunas
+        if c not in ("tenant_id", "codigo", "hash_registro")
+    ]
+
+    # ATENÇÃO: processado_em precisa vir ANTES de hash_registro.
+    # O MySQL avalia as atribuições da esquerda para a direita; aqui
+    # ele ainda enxerga o hash antigo.
+    sql = f"""
+        INSERT INTO `pos_venda_raw` ({colunas_sql})
+        VALUES ({placeholders})
+        ON DUPLICATE KEY UPDATE
+            `processado_em` = IF(
+                `hash_registro` <=> VALUES(`hash_registro`),
+                `processado_em`,
+                NULL
+            ),
+            {", ".join(updates)},
+            `hash_registro` = VALUES(`hash_registro`)
+    """
+
+    cursor.execute(sql, tuple(dados.values()))
+
+
+# ============================================================
+# BRONZE - TABELAS FILHAS
+# ============================================================
+
+CAMPOS_PECA = [
+    "codigo_peca",
+    "referencia_peca",
+    "descricao_peca",
+    "unidade_peca",
+    "qtd_peca",
+    "valor_unitario",
+    "custo_unitario",
+    "custo_total",
+    "total_bruto",
+    "valor_desconto",
+    "total_liquido",
+    "codigo_mecanico",
+    "nome_mecanico",
+    "percentual_comissao_mecanico",
+    "valor_comissao_mecanico",
+    "peca_cancelada",
+    "codigo_motivo_cancelamento",
+    "descricao_motivo_cancelamento",
+]
+
+CAMPOS_SERVICO = [
+    "codigo_servico",
+    "referencia_servico",
+    "descricao_servico",
+    "unidade_servico",
+    "qtd_servico",
+    "valor_unitario",
+    "custo_unitario",
+    "custo_total",
+    "total_bruto",
+    "valor_desconto",
+    "total_liquido",
+    "codigo_mecanico",
+    "nome_mecanico",
+    "percentual_comissao_mecanico",
+    "valor_comissao_mecanico",
+    "servico_cancelado",
+    "codigo_motivo_cancelamento",
+    "descricao_motivo_cancelamento",
+]
+
+CAMPOS_NOTA = [
+    "tipo",
+    "descricao",
+    "codigo_nota",
+    "numero_nota",
+    "chave_nota",
+    "data_faturamento",
+    "operacao",
+]
+
+CAMPOS_PARCELA = [
+    "tipo_parcela",
+    "ordem_parcela",
+    "vencimento_parcela",
+    "forma_cobranca_parcela",
+    "valor_parcela",
+]
+
+TABELAS_FILHAS_RAW = (
+    "pos_venda_peca_raw",
+    "pos_venda_servico_raw",
+    "pos_venda_nota_raw",
+    "pos_venda_parcela_raw",
+)
+
+
+def _inserir_filhos(
+    cursor,
+    tabela: str,
+    tenant_id: int,
+    codigo_origem,
+    campos: list[str],
+    linhas: list[dict],
+    booleanos: tuple = (),
+    datas_iso: tuple = (),
+    datas_br: tuple = (),
+) -> None:
+    """
+    UPSERT incremental dos filhos pela chave (tenant_id, codposv, seq).
+    Não apaga nada: linhas existentes são atualizadas no lugar.
+    """
+
+    if not linhas:
+        return
+
+    colunas = ["tenant_id", "codigo", "codposv", "seq", *campos]
+
+    colunas_sql = ", ".join(f"`{c}`" for c in colunas)
+    placeholders = ", ".join(["%s"] * len(colunas))
+    updates = ", ".join(f"`{c}`=VALUES(`{c}`)" for c in campos)
+
+    sql = f"""
+        INSERT INTO `{tabela}` ({colunas_sql})
+        VALUES ({placeholders})
+        ON DUPLICATE KEY UPDATE {updates}
+    """
+
+    def normalizar_valor(linha: dict, campo: str):
+        valor = linha.get(campo)
+
+        if campo in booleanos:
+            return _booleano_mysql(valor)
+
+        if campo in datas_iso:
+            return _converter_data_iso(valor)
+
+        if campo in datas_br:
+            return _converter_data_br(valor)
+
+        return valor
+
+    valores = [
+        (
+            tenant_id,
+            codigo_origem,
+            codigo_origem,
+            seq,
+            *[normalizar_valor(linha, campo) for campo in campos],
+        )
+        for seq, linha in enumerate(linhas)
+    ]
+
+    cursor.executemany(sql, valores)
+
+
+def _montar_parcelas(item: dict) -> list[dict]:
+    """Junta as 3 listas de parcelas em ordem fixa (define o seq)."""
+    parcelas = []
+
+    for chave, tipo in (
+        ("parcelas_condicao_pagamento_pecas", "PECA"),
+        ("parcelas_condicao_pagamento_servico", "SERVICO"),
+        ("parcelas_condicao_pagamento_franquia", "FRANQUIA"),
+    ):
+        for p in item.get(chave) or []:
+            parcelas.append({**p, "tipo_parcela": tipo})
+
+    return parcelas
+
+
+def _salvar_filhos_item(cursor, tenant_id: int, codigo_origem, item: dict) -> None:
+
+    _inserir_filhos(
+        cursor, "pos_venda_peca_raw", tenant_id, codigo_origem,
+        CAMPOS_PECA, item.get("pecas") or [],
+        booleanos=("peca_cancelada",),
+    )
+
+    _inserir_filhos(
+        cursor, "pos_venda_servico_raw", tenant_id, codigo_origem,
+        CAMPOS_SERVICO, item.get("servicos") or [],
+        booleanos=("servico_cancelado",),
+    )
+
+    _inserir_filhos(
+        cursor, "pos_venda_nota_raw", tenant_id, codigo_origem,
+        CAMPOS_NOTA, item.get("notas") or [],
+        datas_iso=("data_faturamento",),
+    )
+
+    _inserir_filhos(
+        cursor, "pos_venda_parcela_raw", tenant_id, codigo_origem,
+        CAMPOS_PARCELA, _montar_parcelas(item),
+        datas_br=("vencimento_parcela",),
+    )
+
+
+# ============================================================
+# BRONZE - SALVAR PÁGINA (INCREMENTAL)
+# ============================================================
+
+def salvar_pagina_raw(
+    tenant_id: int,
+    pipeline: str,
+    offset_pagina: int,
+    itens: list[dict],
+) -> None:
+
     if not itens:
         return
 
+    invalidos = [i for i in itens if not isinstance(i, dict)]
+    if invalidos:
+        logger.error(
+            "Itens inválidos ignorados: tenant=%s offset=%s qtd=%s exemplo=%r",
+            tenant_id, offset_pagina, len(invalidos), invalidos[0],
+        )
+        itens = [i for i in itens if isinstance(i, dict)]
+        if not itens:
+            return
+
     agora = datetime.now()
+
     conn = connection_mysql()
     cursor = conn.cursor()
 
     try:
-        codigos_origem = []
+
+        codigos = [
+            i.get("codigo") for i in itens
+            if i.get("codigo") is not None
+        ]
+
+        hashes = _hashes_existentes(cursor, tenant_id, codigos)
+
+        gravados = 0
+        ignorados = 0
 
         for item in itens:
+
             codigo_origem = item.get("codigo")
-            if not codigo_origem:
+
+            if codigo_origem is None:
+                logger.warning(
+                    "Pós-venda sem código ignorada: tenant=%s offset=%s",
+                    tenant_id,
+                    offset_pagina,
+                )
                 continue
-            codigos_origem.append(codigo_origem)
 
-            cursor.execute(
-                """
-                INSERT INTO pos_venda_raw (
-                    tenant_id, codigo_origem, tipo, descricao_tipo, orcamento_os,
-                    numero, codigo_situacao, situacao, aguardando_liberacao,
-                    codigo_empresa, nome_empresa, codigo_cliente, nome_cliente,
-                    codigo_tipo_preco, descricao_tipo_preco, codigo_veiculo, placa_veiculo,
-                    codigo_modelo_veiculo, descricao_modelo_veiculo, codigo_cor_veiculo,
-                    descricao_cor_veiculo, ano_fabricacao_veiculo, ano_modelo_veiculo,
-                    codigo_tipo_os, descricao_tipo_os, km_entrada, km_saida,
-                    data_entrada, data_saida, solicitacao_cliente, avaria, defeito_averiguado,
-                    codigo_proprietario, nome_proprietario, codigo_tipo_midia, descricao_tipo_midia,
-                    codigo_modalidade_venda, descricao_modalidade_venda, codigo_conveniado,
-                    nome_conveniado, codigo_consultor, nome_consultor,
-                    percentual_comissao_peca, valor_comissao_peca_consultor,
-                    percentual_comissao_servico, valor_comissao_servico_consultor,
-                    total_comissao_consultor, observacao, observacao_nota,
-                    codigo_usuario_insercao, nome_usuario_insercao, data_insercao,
-                    codigo_usuario_alteracao, nome_usuario_alteracao, data_alteracao,
-                    codigo_usuario_cancelamento, nome_usuario_cancelamento, data_cancelamento,
-                    codigo_usuario_fechamento, nome_usuario_fechamento, data_fechamento,
-                    valor_seguro, valor_frete, valor_despesas, valor_acrescimo_financeiro,
-                    total_pecas_bruto, total_desconto_pecas, total_pecas_liquido,
-                    total_pecas_custo, total_pecas_lucro,
-                    total_servicos_bruto, total_desconto_servicos, total_servicos_liquido,
-                    total_servicos_custo, total_servicos_lucro, total_geral,
-                    codigo_condicao_pagamento, descricao_condicao_pagamento,
-                    atualizado_em, processado_em
-                ) VALUES (
-                    %s,%s,%s,%s,%s, %s,%s,%s,%s, %s,%s,%s,%s, %s,%s,%s,%s,
-                    %s,%s,%s, %s,%s,%s, %s,%s,%s,%s, %s,%s,%s,%s,%s,
-                    %s,%s,%s,%s, %s,%s,%s, %s,%s,%s, %s,%s, %s,%s, %s,%s,%s,
-                    %s,%s,%s, %s,%s,%s, %s,%s,%s, %s,%s,%s,
-                    %s,%s,%s,%s, %s,%s,%s,%s,%s, %s,%s,%s,%s,%s,%s, %s,%s,
-                    %s, NULL
-                )
-                ON DUPLICATE KEY UPDATE
-                    tipo=VALUES(tipo), descricao_tipo=VALUES(descricao_tipo), orcamento_os=VALUES(orcamento_os),
-                    numero=VALUES(numero), codigo_situacao=VALUES(codigo_situacao), situacao=VALUES(situacao),
-                    aguardando_liberacao=VALUES(aguardando_liberacao),
-                    codigo_empresa=VALUES(codigo_empresa), nome_empresa=VALUES(nome_empresa),
-                    codigo_cliente=VALUES(codigo_cliente), nome_cliente=VALUES(nome_cliente),
-                    codigo_tipo_preco=VALUES(codigo_tipo_preco), descricao_tipo_preco=VALUES(descricao_tipo_preco),
-                    codigo_veiculo=VALUES(codigo_veiculo), placa_veiculo=VALUES(placa_veiculo),
-                    codigo_modelo_veiculo=VALUES(codigo_modelo_veiculo),
-                    descricao_modelo_veiculo=VALUES(descricao_modelo_veiculo),
-                    codigo_cor_veiculo=VALUES(codigo_cor_veiculo), descricao_cor_veiculo=VALUES(descricao_cor_veiculo),
-                    ano_fabricacao_veiculo=VALUES(ano_fabricacao_veiculo), ano_modelo_veiculo=VALUES(ano_modelo_veiculo),
-                    codigo_tipo_os=VALUES(codigo_tipo_os), descricao_tipo_os=VALUES(descricao_tipo_os),
-                    km_entrada=VALUES(km_entrada), km_saida=VALUES(km_saida),
-                    data_entrada=VALUES(data_entrada), data_saida=VALUES(data_saida),
-                    solicitacao_cliente=VALUES(solicitacao_cliente), avaria=VALUES(avaria),
-                    defeito_averiguado=VALUES(defeito_averiguado),
-                    codigo_proprietario=VALUES(codigo_proprietario), nome_proprietario=VALUES(nome_proprietario),
-                    codigo_tipo_midia=VALUES(codigo_tipo_midia), descricao_tipo_midia=VALUES(descricao_tipo_midia),
-                    codigo_modalidade_venda=VALUES(codigo_modalidade_venda),
-                    descricao_modalidade_venda=VALUES(descricao_modalidade_venda),
-                    codigo_conveniado=VALUES(codigo_conveniado), nome_conveniado=VALUES(nome_conveniado),
-                    codigo_consultor=VALUES(codigo_consultor), nome_consultor=VALUES(nome_consultor),
-                    percentual_comissao_peca=VALUES(percentual_comissao_peca),
-                    valor_comissao_peca_consultor=VALUES(valor_comissao_peca_consultor),
-                    percentual_comissao_servico=VALUES(percentual_comissao_servico),
-                    valor_comissao_servico_consultor=VALUES(valor_comissao_servico_consultor),
-                    total_comissao_consultor=VALUES(total_comissao_consultor),
-                    observacao=VALUES(observacao), observacao_nota=VALUES(observacao_nota),
-                    codigo_usuario_insercao=VALUES(codigo_usuario_insercao),
-                    nome_usuario_insercao=VALUES(nome_usuario_insercao), data_insercao=VALUES(data_insercao),
-                    codigo_usuario_alteracao=VALUES(codigo_usuario_alteracao),
-                    nome_usuario_alteracao=VALUES(nome_usuario_alteracao), data_alteracao=VALUES(data_alteracao),
-                    codigo_usuario_cancelamento=VALUES(codigo_usuario_cancelamento),
-                    nome_usuario_cancelamento=VALUES(nome_usuario_cancelamento),
-                    data_cancelamento=VALUES(data_cancelamento),
-                    codigo_usuario_fechamento=VALUES(codigo_usuario_fechamento),
-                    nome_usuario_fechamento=VALUES(nome_usuario_fechamento), data_fechamento=VALUES(data_fechamento),
-                    valor_seguro=VALUES(valor_seguro), valor_frete=VALUES(valor_frete),
-                    valor_despesas=VALUES(valor_despesas), valor_acrescimo_financeiro=VALUES(valor_acrescimo_financeiro),
-                    total_pecas_bruto=VALUES(total_pecas_bruto), total_desconto_pecas=VALUES(total_desconto_pecas),
-                    total_pecas_liquido=VALUES(total_pecas_liquido), total_pecas_custo=VALUES(total_pecas_custo),
-                    total_pecas_lucro=VALUES(total_pecas_lucro),
-                    total_servicos_bruto=VALUES(total_servicos_bruto), total_desconto_servicos=VALUES(total_desconto_servicos),
-                    total_servicos_liquido=VALUES(total_servicos_liquido), total_servicos_custo=VALUES(total_servicos_custo),
-                    total_servicos_lucro=VALUES(total_servicos_lucro), total_geral=VALUES(total_geral),
-                    codigo_condicao_pagamento=VALUES(codigo_condicao_pagamento),
-                    descricao_condicao_pagamento=VALUES(descricao_condicao_pagamento),
-                    atualizado_em=VALUES(atualizado_em),
-                    processado_em=NULL
-                """,
-                (
-                    tenant_id, codigo_origem, item.get("tipo"), item.get("descricao_tipo"), item.get("orcamento_os"),
-                    item.get("numero"), item.get("codigo_situacao"), item.get("situacao"), item.get("aguardando_liberacao"),
-                    item.get("codigo_empresa"), item.get("nome_empresa"), item.get("codigo_cliente"), item.get("nome_cliente"),
-                    item.get("codigo_tipo_preco"), item.get("descricao_tipo_preco"), item.get("codigo_veiculo"), item.get("placa_veiculo"),
-                    item.get("codigo_modelo_veiculo"), item.get("descricao_modelo_veiculo"), item.get("codigo_cor_veiculo"),
-                    item.get("descricao_cor_veiculo"), item.get("ano_fabricacao_veiculo"), item.get("ano_modelo_veiculo"),
-                    item.get("codigo_tipo_os"), item.get("descricao_tipo_os"), item.get("km_entrada"), item.get("km_saida"),
-                    _converter_data_iso(item.get("data_entrada")), _converter_data_iso(item.get("data_saida")),
-                    item.get("solicitacao_cliente"), item.get("avaria"), item.get("defeito_averiguado"),
-                    item.get("codigo_proprietario"), item.get("nome_proprietario"), item.get("codigo_tipo_midia"), item.get("descricao_tipo_midia"),
-                    item.get("codigo_modalidade_venda"), item.get("descricao_modalidade_venda"), item.get("codigo_conveniado"),
-                    item.get("nome_conveniado"), item.get("codigo_consultor"), item.get("nome_consultor"),
-                    item.get("percentual_comissao_peca"), item.get("valor_comissao_peca_consultor"),
-                    item.get("percentual_comissao_servico"), item.get("valor_comissao_servico_consultor"),
-                    item.get("total_comissao_consultor"), item.get("observacao"), item.get("observacao_nota"),
-                    item.get("codigo_usuario_insercao"), item.get("nome_usuario_insercao"), _converter_data_iso(item.get("data_insercao")),
-                    item.get("codigo_usuario_alteracao"), item.get("nome_usuario_alteracao"), _converter_data_iso(item.get("data_alteracao")),
-                    item.get("codigo_usuario_cancelamento"), item.get("nome_usuario_cancelamento"), _converter_data_iso(item.get("data_cancelamento")),
-                    item.get("codigo_usuario_fechamento"), item.get("nome_usuario_fechamento"), _converter_data_iso(item.get("data_fechamento")),
-                    item.get("valor_seguro"), item.get("valor_frete"), item.get("valor_despesas"), item.get("valor_acrescimo_financeiro"),
-                    item.get("total_pecas_bruto"), item.get("total_desconto_pecas"), item.get("total_pecas_liquido"),
-                    item.get("total_pecas_custo"), item.get("total_pecas_lucro"),
-                    item.get("total_servicos_bruto"), item.get("total_desconto_servicos"), item.get("total_servicos_liquido"),
-                    item.get("total_servicos_custo"), item.get("total_servicos_lucro"), item.get("total_geral"),
-                    item.get("codigo_condicao_pagamento"), item.get("descricao_condicao_pagamento"),
-                    agora,
-                ),
+            dados = _linha_pos_venda_raw(
+                tenant_id,
+                codigo_origem,
+                item,
+                agora,
             )
 
-            cursor.execute("DELETE FROM pos_venda_peca_raw WHERE tenant_id=%s AND codposv=%s", (tenant_id, codigo_origem))
-            cursor.execute("DELETE FROM pos_venda_servico_raw WHERE tenant_id=%s AND codposv=%s", (tenant_id, codigo_origem))
-            cursor.execute("DELETE FROM pos_venda_nota_raw WHERE tenant_id=%s AND codposv=%s", (tenant_id, codigo_origem))
-            cursor.execute("DELETE FROM pos_venda_parcela_raw WHERE tenant_id=%s AND codposv=%s", (tenant_id, codigo_origem))
+            # Nada mudou na API: não toca no principal nem nos filhos.
+            if hashes.get(codigo_origem) == dados["hash_registro"]:
+                ignorados += 1
+                continue
 
-            pecas = item.get("pecas") or []
-            if pecas:
-                cursor.executemany(
-                    """
-                    INSERT INTO pos_venda_peca_raw (
-                        tenant_id, codposv, codigo_peca, referencia_peca, descricao_peca, unidade_peca,
-                        qtd_peca, valor_unitario, custo_unitario, custo_total, total_bruto, valor_desconto,
-                        total_liquido, codigo_mecanico, nome_mecanico, percentual_comissao_mecanico,
-                        valor_comissao_mecanico, peca_cancelada, codigo_motivo_cancelamento, descricao_motivo_cancelamento
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    """,
-                    [
-                        (
-                            tenant_id, codigo_origem, p.get("codigo_peca"), p.get("referencia_peca"), p.get("descricao_peca"),
-                            p.get("unidade_peca"), p.get("qtd_peca"), p.get("valor_unitario"), p.get("custo_unitario"),
-                            p.get("custo_total"), p.get("total_bruto"), p.get("valor_desconto"), p.get("total_liquido"),
-                            p.get("codigo_mecanico"), p.get("nome_mecanico"), p.get("percentual_comissao_mecanico"),
-                            p.get("valor_comissao_mecanico"), p.get("peca_cancelada"), p.get("codigo_motivo_cancelamento"),
-                            p.get("descricao_motivo_cancelamento"),
-                        )
-                        for p in pecas
-                    ],
-                )
+            _upsert_principal(cursor, dados)
+            _salvar_filhos_item(cursor, tenant_id, codigo_origem, item)
 
-            servicos = item.get("servicos") or []
-            if servicos:
-                cursor.executemany(
-                    """
-                    INSERT INTO pos_venda_servico_raw (
-                        tenant_id, codposv, codigo_servico, referencia_servico, descricao_servico, unidade_servico,
-                        qtd_servico, valor_unitario, custo_unitario, custo_total, total_bruto, valor_desconto,
-                        total_liquido, codigo_mecanico, nome_mecanico, percentual_comissao_mecanico,
-                        valor_comissao_mecanico, servico_cancelado, codigo_motivo_cancelamento, descricao_motivo_cancelamento
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    """,
-                    [
-                        (
-                            tenant_id, codigo_origem, s.get("codigo_servico"), s.get("referencia_servico"), s.get("descricao_servico"),
-                            s.get("unidade_servico"), s.get("qtd_servico"), s.get("valor_unitario"), s.get("custo_unitario"),
-                            s.get("custo_total"), s.get("total_bruto"), s.get("valor_desconto"), s.get("total_liquido"),
-                            s.get("codigo_mecanico"), s.get("nome_mecanico"), s.get("percentual_comissao_mecanico"),
-                            s.get("valor_comissao_mecanico"), s.get("servico_cancelado"), s.get("codigo_motivo_cancelamento"),
-                            s.get("descricao_motivo_cancelamento"),
-                        )
-                        for s in servicos
-                    ],
-                )
-
-            notas = item.get("notas") or []
-            if notas:
-                cursor.executemany(
-                    """
-                    INSERT INTO pos_venda_nota_raw (
-                        tenant_id, codposv, tipo, descricao, codigo_nota, numero_nota,
-                        chave_nota, data_faturamento, operacao
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    """,
-                    [
-                        (
-                            tenant_id, codigo_origem, n.get("tipo"), n.get("descricao"), n.get("codigo_nota"),
-                            n.get("numero_nota"), n.get("chave_nota"), _converter_data_iso(n.get("data_faturamento")),
-                            n.get("operacao"),
-                        )
-                        for n in notas
-                    ],
-                )
-
-            parcelas = (
-                [(p, "PECA") for p in (item.get("parcelas_condicao_pagamento_pecas") or [])]
-                + [(p, "SERVICO") for p in (item.get("parcelas_condicao_pagamento_servico") or [])]
-                + [(p, "FRANQUIA") for p in (item.get("parcelas_condicao_pagamento_franquia") or [])]
-            )
-            if parcelas:
-                cursor.executemany(
-                    """
-                    INSERT INTO pos_venda_parcela_raw (
-                        tenant_id, codposv, tipo_parcela, ordem_parcela, vencimento_parcela,
-                        forma_cobranca_parcela, valor_parcela
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s)
-                    """,
-                    [
-                        (
-                            tenant_id, codigo_origem, tipo_parcela, p.get("ordem_parcela"),
-                            _converter_data_br(p.get("vencimento_parcela")), p.get("forma_cobranca_parcela"),
-                            p.get("valor_parcela"),
-                        )
-                        for p, tipo_parcela in parcelas
-                    ],
-                )
+            gravados += 1
 
         conn.commit()
-        # logger.info(f"[pos_venda] tenant={tenant_id} página={offset_pagina}: {len(codigos_origem)} pós-vendas persistidos.")
+
+        logger.info(
+            "Pós-vendas bronze: tenant=%s pipeline=%s offset=%s "
+            "gravados=%s ignorados=%s",
+            tenant_id,
+            pipeline,
+            offset_pagina,
+            gravados,
+            ignorados,
+        )
 
     except Exception:
+
         conn.rollback()
+
+        logger.exception(
+            "Erro ao salvar pós-vendas: tenant=%s pipeline=%s offset=%s",
+            tenant_id,
+            pipeline,
+            offset_pagina,
+        )
+
         raise
+
     finally:
         cursor.close()
         conn.close()
 
 
-# ==========================================
-# LEITURA PARA A SILVER
-# ==========================================
+# ============================================================
+# LEITURA PARA SILVER
+# ============================================================
 
-def buscar_pos_venda_pendentes(tenant_id: int, limite: int = 500) -> list[dict]:
+def buscar_pos_venda_pendentes(
+    tenant_id: int,
+    limite: int = 500,
+    ultimo_id: int = 0,
+) -> list[dict]:
+    """
+    Busca pendentes (processado_em IS NULL) usando paginação por id (keyset).
+    O ultimo_id impede que registros com erro sejam relidos em loop
+    e bloqueiem a fila.
+    """
+
     conn = connection_mysql()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute(
-        """
-        SELECT * FROM pos_venda_raw
-        WHERE tenant_id = %s AND processado_em IS NULL
-        ORDER BY id
-        LIMIT %s
-        """,
-        (tenant_id, limite),
-    )
-    linhas = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return linhas
 
-
-def buscar_filhos(tabela: str, tenant_id: int, codigo_origem: int) -> list[dict]:
-    if tabela not in {
-        "pos_venda_peca_raw", "pos_venda_servico_raw",
-        "pos_venda_nota_raw", "pos_venda_parcela_raw",
-    }:
-        raise ValueError(f"Tabela não reconhecida: {tabela}")
-    conn = connection_mysql()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute(
-        f"SELECT * FROM {tabela} WHERE tenant_id=%s AND codposv=%s",
-        (tenant_id, codigo_origem),
-    )
-    linhas = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return linhas
-
-
-def marcar_processado(ids: list[int]) -> None:
-    if not ids:
-        return
-    conn = connection_mysql()
-    cursor = conn.cursor()
-    placeholders = ",".join(["%s"] * len(ids))
-    cursor.execute(
-        f"UPDATE pos_venda_raw SET processado_em = NOW() WHERE id IN ({placeholders})",
-        tuple(ids),
-    )
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-
-# ==========================================
-# SILVER — upsert nas tabelas BI (pai + filhos)
-# ==========================================
-
-def upsert_pos_venda_bi(tenant_id: int, codigo_origem: int, bi: dict, filhos: dict) -> None:
-    """
-    filhos = {"pecas": [...], "servicos": [...], "notas": [...], "parcelas": [...]}
-    já no formato de colunas da BI (ver silver/transform/sances/pos_venda.py).
-    """
-    conn = connection_mysql()
-    cursor = conn.cursor()
     try:
-        colunas = list(bi.keys())
-        placeholders = [f"%({c})s" for c in colunas]
-        updates = [f"{c}=VALUES({c})" for c in colunas if c != "codigo_origem"]
+
+        cursor.execute(
+            """
+            SELECT *
+            FROM pos_venda_raw
+            WHERE tenant_id = %s
+              AND processado_em IS NULL
+              AND id > %s
+            ORDER BY id
+            LIMIT %s
+            """,
+            (tenant_id, ultimo_id, limite),
+        )
+
+        return cursor.fetchall()
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def contar_pos_venda_pendentes(tenant_id: int) -> int:
+    """Quantos registros ainda estão com processado_em NULL (acompanhamento)."""
+
+    conn = connection_mysql()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM pos_venda_raw
+            WHERE tenant_id = %s
+              AND processado_em IS NULL
+            """,
+            (tenant_id,),
+        )
+
+        return cursor.fetchone()[0]
+
+    finally:
+        cursor.close()
+        conn.close()
+
+        
+def buscar_filhos_lote(
+    tenant_id: int,
+    codigo: int,
+    tabela: str,
+    limite: int = 200,
+    ultimo_seq: int = -1,
+) -> list[dict]:
+    """
+    Busca um lote de filhos de um único pós-venda.
+
+    Não carrega todos os filhos na memória.
+    Utiliza seq para paginação incremental.
+    """
+
+    tabelas_permitidas = {
+        "pos_venda_peca_raw",
+        "pos_venda_servico_raw",
+        "pos_venda_nota_raw",
+        "pos_venda_parcela_raw",
+    }
+
+    if tabela not in tabelas_permitidas:
+        raise ValueError(f"Tabela de filhos não permitida: {tabela}")
+
+    limite = max(1, min(int(limite), 200))
+
+    conn = connection_mysql()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
         cursor.execute(
             f"""
-            INSERT INTO pos_venda_bi ({', '.join(colunas)})
-            VALUES ({', '.join(placeholders)})
-            ON DUPLICATE KEY UPDATE {', '.join(updates)}
+                SELECT *
+                FROM `{tabela}`
+                WHERE tenant_id = %s
+                  AND codposv = %s
+                  AND seq > %s
+                ORDER BY seq
+                LIMIT %s
             """,
-            bi,
+            (tenant_id, codigo, ultimo_seq, limite),
         )
 
-        # busca o id interno do pai pra referenciar nos filhos
-        cursor.execute(
-            "SELECT id FROM pos_venda_bi WHERE tenant_id=%s AND codigo_origem=%s",
-            (tenant_id, codigo_origem),
-        )
-        codigo_posvenda = cursor.fetchone()[0]
+        return cursor.fetchall()
 
-        for tabela, chave_codigo, linhas in (
-            ("pos_venda_peca_bi", "codigo_peca", filhos.get("pecas", [])),
-            ("pos_venda_servico_bi", "codigo_servico", filhos.get("servicos", [])),
-            ("nota_bi", "codigo_nota", filhos.get("notas", [])),
-            ("pos_venda_parcela_bi", None, filhos.get("parcelas", [])),
-        ):
-            cursor.execute(
-                f"DELETE FROM {tabela} WHERE tenant_id=%s AND codigo_origem=%s",
-                (tenant_id, codigo_origem),
-            )
-            if not linhas:
-                continue
-            for linha in linhas:
-                linha["tenant_id"] = tenant_id
-                linha["codigo_posvenda"] = codigo_posvenda
-                linha["codigo_origem"] = codigo_origem
-            colunas_f = list(linhas[0].keys())
-            placeholders_f = ", ".join(["%s"] * len(colunas_f))
-            cursor.executemany(
-                f"INSERT INTO {tabela} ({', '.join(colunas_f)}) VALUES ({placeholders_f})",
-                [tuple(linha[c] for c in colunas_f) for linha in linhas],
-            )
+    finally:
+        cursor.close()
+        conn.close()
+        
+def marcar_processado(
+    tenant_id: int,
+    registros: list[tuple],
+) -> None:
+
+    if not registros:
+        return
+
+    conn = connection_mysql()
+    cursor = conn.cursor()
+
+    try:
+        cursor.executemany(
+            """
+                UPDATE pos_venda_raw
+                SET processado_em = NOW()
+                WHERE tenant_id = %s
+                  AND id = %s
+                  AND hash_registro <=> %s
+                  AND processado_em IS NULL
+            """,
+            [
+                (tenant_id, registro_id, hash_registro)
+                for registro_id, hash_registro in registros
+            ],
+        )
 
         conn.commit()
+
     except Exception:
         conn.rollback()
         raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ============================================================
+# SILVER - COLUNAS DAS TABELAS BI FILHAS
+# ============================================================
+
+COLUNAS_BI_FILHOS = {
+
+    "pos_venda_peca_bi": [
+        "codigo_peca",
+        "unidade_peca",
+        "qtd_peca",
+        "valor_unitario",
+        "custo_unitario",
+        "custo_total",
+        "total_bruto",
+        "valor_desconto",
+        "total_liquido",
+        "codigo_mecanico",
+        "percentual_comissao_mecanico",
+        "valor_comissao_mecanico",
+        "peca_cancelada",
+        "codigo_motivo_cancelamento",
+    ],
+
+    "pos_venda_servico_bi": [
+        "codigo_servico",
+        "referencia_servico",
+        "descricao_servico",
+        "unidade_servico",
+        "qtd_servico",
+        "valor_unitario",
+        "custo_unitario",
+        "custo_total",
+        "total_bruto",
+        "valor_desconto",
+        "total_liquido",
+        "codigo_mecanico",
+        "nome_mecanico",
+        "percentual_comissao_mecanico",
+        "valor_comissao_mecanico",
+        "servico_cancelado",
+        "codigo_motivo_cancelamento",
+    ],
+
+    "nota_bi": [
+        "tipo",
+        "descricao",
+        "codigo_nota",
+        "numero_nota",
+        "chave_nota",
+        "data_faturamento",
+        "operacao",
+    ],
+
+    "pos_venda_parcela_bi": [
+        "tipo_parcela",
+        "ordem_parcela",
+        "vencimento_parcela",
+        "forma_cobranca_parcela",
+        "valor_parcela",
+    ],
+}
+
+
+# ============================================================
+# SILVER - UPSERT DO PÓS-VENDA (INCREMENTAL)
+# ============================================================
+
+def upsert_pos_venda_bi_principal(
+    tenant_id: int,
+    codigo_origem: int,
+    bi: dict,
+) -> None:
+
+    conn = connection_mysql()
+    cursor = conn.cursor()
+
+    try:
+        bi = dict(bi)
+
+        bi["tenant_id"] = tenant_id
+        bi["codigo"] = codigo_origem
+        bi["codigo_origem"] = codigo_origem
+
+        colunas = list(bi.keys())
+
+        placeholders = [f"%({c})s" for c in colunas]
+
+        updates = [
+            f"`{c}`=VALUES(`{c}`)"
+            for c in colunas
+            if c not in (
+                "tenant_id",
+                "codigo",
+                "codigo_origem",
+            )
+        ]
+
+        sql = f"""
+            INSERT INTO pos_venda_bi ({", ".join(f"`{c}`" for c in colunas)})
+            VALUES ({", ".join(placeholders)})
+            ON DUPLICATE KEY UPDATE
+                {", ".join(updates)}
+        """
+
+        cursor.execute(sql, bi)
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        logger.exception(
+            "Erro ao gravar principal: tenant=%s codigo=%s",
+            tenant_id,
+            codigo_origem,
+        )
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ============================================================
+# SILVER - UPSERT DO FILHOS (INCREMENTAL)
+# ============================================================
+
+def upsert_pos_venda_bi_filhos(
+    tenant_id: int,
+    codigo_origem: int,
+    tabela: str,
+    linhas: list[dict],
+) -> None:
+
+    if not linhas:
+        return
+
+    if tabela not in COLUNAS_BI_FILHOS:
+        raise ValueError(f"Tabela BI não permitida: {tabela}")
+
+    campos = COLUNAS_BI_FILHOS[tabela]
+
+    colunas = [
+        "tenant_id",
+        "codigo",
+        "codigo_posvenda",
+        "codigo_origem",
+        "seq",
+        *campos,
+        "data_carga",
+    ]
+
+    colunas_sql = ", ".join(f"`{c}`" for c in colunas)
+    placeholders = ", ".join(["%s"] * len(colunas))
+
+    updates = ", ".join(
+        f"`{c}`=VALUES(`{c}`)"
+        for c in (*campos, "data_carga")
+    )
+
+    sql = f"""
+        INSERT INTO `{tabela}` ({colunas_sql})
+        VALUES ({placeholders})
+        ON DUPLICATE KEY UPDATE {updates}
+    """
+
+    agora = datetime.now()
+
+    valores = [
+        (
+            tenant_id,
+            codigo_origem,
+            codigo_origem,
+            codigo_origem,
+            linha["seq"],
+            *[linha.get(campo) for campo in campos],
+            agora,
+        )
+        for linha in linhas
+    ]
+
+    conn = connection_mysql()
+    cursor = conn.cursor()
+
+    try:
+        cursor.executemany(sql, valores)
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        logger.exception(
+            "Erro ao gravar filhos: tenant=%s codigo=%s tabela=%s",
+            tenant_id,
+            codigo_origem,
+            tabela,
+        )
+        raise
+
     finally:
         cursor.close()
         conn.close()

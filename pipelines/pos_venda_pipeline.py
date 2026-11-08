@@ -46,43 +46,31 @@ class StepExtrairPosVenda(Step):
 
         return context
 
-
 class StepTransformarPosVenda(Step):
 
-    def __init__(
-        self,
-        limite_por_execucao: int = 500
-    ):
-
+    def __init__(self, limite_por_execucao: int | None = None):
         super().__init__("TransformarPosVenda")
-
         self.limite_por_execucao = limite_por_execucao
 
-    def execute(
-        self, 
-        context: dict
-    ) -> dict:
+    def execute(self, context: dict) -> dict:
 
         tenant_id = context["tenant_id"]
 
         resultado = processar_pos_venda_pendentes(
             tenant_id=tenant_id,
-            limite=self.limite_por_execucao
+            limite=self.limite_por_execucao,
         )
 
         context["silver_pos_venda_resultado"] = resultado
 
-        # logger.info(f"[SILVER-POS_VENDA] tenant={tenant_id} {resultado}")
-
         return context
-
-
+    
 def executar_pipeline_pos_venda(
     tenant_id: int,
     limit: int = 100,
     offset_inicial: int | None = None,
     filtros: dict | None = None,
-    limite_silver_por_execucao: int = 500,
+    limite_silver_por_execucao: int | None = None,
 ) -> dict:
 
     token = buscar_token_por_nome(
