@@ -333,9 +333,7 @@ limit: int = Query(50, ge=1, le=200),
 
 
 # ============================================================
-
 # RESUMO
-
 # ============================================================
 
 @router.get(
@@ -458,9 +456,7 @@ def resumo_equipamentos():
 
 
 # ============================================================
-
 # OBTER POR ID
-
 # ============================================================
 
 @router.get(
@@ -489,9 +485,7 @@ equipamento_id: int
 
 
 # ============================================================
-
 # HISTÓRICO
-
 # ============================================================
 
 @router.get(
@@ -603,9 +597,7 @@ equipamento_id: int
 
 
 # ============================================================
-
 # CRIAR
-
 # ============================================================
 
 @router.post(
@@ -769,9 +761,7 @@ payload: EquipamentoCreate
 
 
 # ============================================================
-
 # ATUALIZAR
-
 # ============================================================
 
 @router.put(
@@ -895,9 +885,7 @@ payload: EquipamentoUpdate
 
 
 # ============================================================
-
 # EXCLUIR — SOFT DELETE
-
 # ============================================================
 
 @router.delete(
@@ -960,9 +948,7 @@ equipamento_id: int
 
 
 # ============================================================
-
 # VINCULAR COLABORADOR
-
 # ============================================================
 
 @router.post(
@@ -1053,7 +1039,7 @@ payload: VincularRequest
             INSERT INTO equipamento_movimentacao
             (
                 tipo_ativo,
-                id_ativo,
+                id_equipamento,
                 id_colaborador,
                 data_vinculo,
                 observacao
@@ -1101,9 +1087,7 @@ payload: VincularRequest
 
 
 # ============================================================
-
 # DEVOLVER EQUIPAMENTO
-
 # ============================================================
 
 @router.post(
@@ -1149,7 +1133,7 @@ payload: DevolverRequest
             FROM equipamento_movimentacao
 
             WHERE tipo_ativo = 'equipamento'
-            AND id_ativo = %s
+            AND id_equipamento = %s
             AND id_colaborador = %s
             AND data_devolucao IS NULL
 

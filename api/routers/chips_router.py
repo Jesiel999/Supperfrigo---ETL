@@ -77,7 +77,9 @@ def _to_out(chip) -> ChipOut:
         nome_empresa=chip["nome_empresa"],
     )
 
-
+# ============================================================
+# Listar
+# ============================================================
 @router.get("", response_model=list[ChipOut])
 def listar_chips(
     empresa: Optional[int] = None,
@@ -156,7 +158,9 @@ def listar_chips(
         cursor.close()
         conn.close()
 
-
+# ============================================================
+# Cadastrar
+# ============================================================
 @router.post(
     "",
     response_model=ChipOut,
@@ -213,7 +217,7 @@ def criar_chip(
             cursor.execute("""
                 INSERT INTO equipamento_movimentacao (
                     tipo_ativo,
-                    id_ativo,
+                    id_chip,
                     id_colaborador,
                     data_vinculo
                 )
@@ -243,7 +247,9 @@ def criar_chip(
         cursor.close()
         conn.close()
 
-
+# ============================================================
+# Editar 
+# ============================================================
 @router.put(
     "/{chip_id}",
     response_model=ChipOut
@@ -306,7 +312,9 @@ def atualizar_chip(
         cursor.close()
         conn.close()
 
-
+# ============================================================
+# Deletar
+# ============================================================
 @router.delete(
     "/{chip_id}",
     status_code=204
@@ -338,7 +346,9 @@ def excluir_chip(
         cursor.close()
         conn.close()
 
-
+# ============================================================
+# Vincular 
+# ============================================================
 @router.post(
     "/{chip_id}/vincular",
     response_model=ChipOut
@@ -404,7 +414,7 @@ def vincular_chip(
         cursor.execute("""
             INSERT INTO equipamento_movimentacao (
                 tipo_ativo,
-                id_ativo,
+                id_chip,
                 id_colaborador,
                 data_vinculo,
                 observacao
@@ -435,7 +445,9 @@ def vincular_chip(
         cursor.close()
         conn.close()
 
-
+# ============================================================
+# Devolução 
+# ============================================================
 @router.post(
     "/{chip_id}/devolver",
     response_model=ChipOut
@@ -470,7 +482,7 @@ def devolver_chip(
             FROM equipamento_movimentacao
 
             WHERE tipo_ativo = 'chip'
-              AND id_ativo = %s
+              AND id_chip = %s
               AND id_colaborador = %s
               AND data_devolucao IS NULL
 
@@ -527,7 +539,9 @@ def devolver_chip(
         cursor.close()
         conn.close()
 
-
+# ============================================================
+# Listar histórico 
+# ============================================================
 @router.get(
     "/{chip_id}/historico",
     response_model=list[MovimentacaoOut]
@@ -560,7 +574,7 @@ def historico_chip(
                 ON p.id = m.id_colaborador
 
             WHERE m.tipo_ativo = 'chip'
-              AND m.id_ativo = %s
+              AND m.id_chip = %s
 
             ORDER BY m.data_vinculo DESC
         """, (chip_id,))

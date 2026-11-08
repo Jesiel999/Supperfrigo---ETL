@@ -44,6 +44,22 @@ def _buscar_pessoa(cursor, pessoa_id: int):
     return pessoa
 
 
+def _buscar_pessoa_por_cpf(cursor, cpf_cnpj: str):
+    cursor.execute("""
+        SELECT
+            id,
+            nome,
+            cpf_cnpj,
+            sexo,
+            colaborador
+        FROM pessoa_bi
+        WHERE cpf_cnpj = %s
+        LIMIT 1
+    """, (cpf_cnpj,))
+
+    return cursor.fetchone()
+
+
 @router.get("", response_model=PessoaListaOut)
 def listar_pessoas(
     busca: Optional[str] = None,
@@ -114,9 +130,51 @@ def criar_pessoa(
     payload: PessoaCreate,
     conn=Depends(connection_mysql),
 ):
+    """
+    Antes de inserir, verifica se já existe uma pessoa com esse
+    cpf_cnpj (a coluna é UNIQUE em pessoa_bi, então um INSERT direto
+    estouraria erro de integridade em vez de uma mensagem clara):
+
+    - CPF já existe E já é colaborador  -> 409, não duplica.
+    - CPF já existe mas não é colaborador (ex.: já era cliente/fornecedor
+      na base) -> reaproveita a linha, só marca colaborador = 1 e
+      atualiza nome/sexo se vierem preenchidos. Não cria uma pessoa nova.
+    - CPF não existe (ou não foi informado) -> cria normalmente.
+    """
     cursor = conn.cursor(dictionary=True)
 
     try:
+        pessoa_existente = None
+
+        if payload.cpf_cnpj:
+            pessoa_existente = _buscar_pessoa_por_cpf(cursor, payload.cpf_cnpj)
+
+        if pessoa_existente:
+            if pessoa_existente["colaborador"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Já existe um colaborador cadastrado com o CPF/CNPJ {payload.cpf_cnpj}."
+                )
+
+            # Pessoa já existia na base (ex.: cliente) mas ainda não era
+            # colaborador — reaproveita a linha em vez de duplicar.
+            cursor.execute("""
+                UPDATE pessoa_bi
+                SET
+                    nome = %s,
+                    sexo = %s,
+                    colaborador = 1
+                WHERE id = %s
+            """, (
+                payload.nome or pessoa_existente["nome"],
+                payload.sexo if payload.sexo is not None else pessoa_existente["sexo"],
+                pessoa_existente["id"],
+            ))
+
+            conn.commit()
+
+            return _buscar_pessoa(cursor, pessoa_existente["id"])
+
         cursor.execute("""
             INSERT INTO pessoa_bi (nome, cpf_cnpj, sexo, colaborador)
             VALUES (%s, %s, %s, %s)
@@ -132,6 +190,59 @@ def criar_pessoa(
         conn.commit()
 
         return _buscar_pessoa(cursor, pessoa_id)
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@router.post("/{cpf_cnpj}/colaborador", response_model=PessoaOut)
+def tornar_colaborador(
+    cpf_cnpj: str,
+    conn=Depends(connection_mysql),
+):
+    """
+    Marca como colaborador uma pessoa que já existe em pessoa_bi
+    (ex.: sincronizada de outro sistema como cliente/fornecedor),
+    identificada pelo CPF/CNPJ. Não cria pessoa nova — se o CPF não
+    existir na base, retorna 404.
+    """
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        pessoa = _buscar_pessoa_por_cpf(cursor, cpf_cnpj)
+
+        if not pessoa:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Nenhuma pessoa encontrada com o CPF/CNPJ {cpf_cnpj}."
+            )
+
+        if pessoa["colaborador"]:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Essa pessoa (CPF/CNPJ {cpf_cnpj}) já é colaborador."
+            )
+
+        cursor.execute("""
+            UPDATE pessoa_bi
+            SET colaborador = 1
+            WHERE id = %s
+        """, (pessoa["id"],))
+
+        conn.commit()
+
+        return _buscar_pessoa(cursor, pessoa["id"])
+
+    except HTTPException:
+        raise
 
     except Exception:
         conn.rollback()
@@ -158,6 +269,15 @@ def atualizar_pessoa(
         if not dados:
             return _buscar_pessoa(cursor, pessoa_id)
 
+        # Se o CPF está sendo alterado, garante que não colide com outra pessoa.
+        if dados.get("cpf_cnpj"):
+            conflito = _buscar_pessoa_por_cpf(cursor, dados["cpf_cnpj"])
+            if conflito and conflito["id"] != pessoa_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Já existe outra pessoa cadastrada com o CPF/CNPJ {dados['cpf_cnpj']}."
+                )
+
         set_clause = ", ".join(f"{campo} = %s" for campo in dados)
         valores = list(dados.values())
         valores.append(pessoa_id)
@@ -170,6 +290,9 @@ def atualizar_pessoa(
         conn.commit()
 
         return _buscar_pessoa(cursor, pessoa_id)
+
+    except HTTPException:
+        raise
 
     except Exception:
         conn.rollback()

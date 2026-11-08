@@ -29,7 +29,9 @@ def _aplicar_filtro_empresa(filtros: list, params: list, id_empresa: Optional[st
         filtros.append("id_empresa = %s")
         params.append(id_empresa)
 
-
+# ============================================================
+# Listar
+# ============================================================
 @router.get("/atual")
 def get_estoque(
     id_empresa: Optional[str] = Query(None),
