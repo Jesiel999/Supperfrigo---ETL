@@ -32,7 +32,19 @@ def executar_sances_diario():
 
     resultados = []
     primeiro_dia = hoje.replace(day=1)
-    ultimo_dia = hoje.replace(day=calendar.monthrange(hoje.year, hoje.month)[1])
+    mes_destino = hoje.month + 2
+    ano_destino = hoje.year + (mes_destino - 1) // 12
+    mes_destino = (mes_destino - 1) % 12 + 1
+    
+    ultimo_dia = hoje.replace(
+        year=ano_destino,
+        month=mes_destino,
+        day=calendar.monthrange(ano_destino, mes_destino)[1],
+        hour=23,
+        minute=59,
+        second=59,
+        microsecond=999999
+    )
 
     resultados = []
     for modo in MODOS_DIARIO:

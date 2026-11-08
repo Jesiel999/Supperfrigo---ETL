@@ -7,8 +7,7 @@ setup_logging()
 def executar_sults_chamados():
 
     return executar_pipeline_chamados(
-        tenant_id=2,
-        # aberto=datetime.now().strftime("%Y-%m-%d"),
+        tenant_id=2
     )
 
 if __name__ == "__main__":
