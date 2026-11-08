@@ -104,20 +104,18 @@ def _filtrar_item(item: dict) -> dict:
 def _extrair_recebimentos(item: dict, codigo_raw, tenant_id: int) -> list[dict]:
 
     recebimentos = item.get("recebimentos") or []
-    
     linhas = []
 
-    data_alteracao_titulo = _converter_data(
-        item.get("data_alteracao")
-    )
+    data_alteracao_titulo = _converter_data(item.get("data_alteracao"))
 
     for r in recebimentos:
-        codigo = r.get("codigo")
-        if not codigo:
+        codigo_recebimento = r.get("codigo")
+        if not codigo_recebimento:
             continue
         linhas.append({
             "tenant_id": tenant_id,
-            "codigo_raw": codigo_raw,
+            "codigo_recebimento": codigo_recebimento,    
+            "codigo": codigo_raw,                       
             "codigo_tipo_movimentacao": r.get("codigo_tipo_movimentacao"),
             "descricao_tipo_movimentacao": r.get("descricao_tipo_movimentacao"),
             "valor_pago": r.get("valor_pago"),

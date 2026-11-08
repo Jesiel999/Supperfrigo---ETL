@@ -8,6 +8,44 @@ logger = get_layer_logger("bronze", "financeiro_repository")
 
 BATCH_COMMIT = 500
 
+# ============================================================
+# BUSCAR DATAS DE MOVIMENTAÇÃO (para cálculo de dias_pagamento/recebimento)
+# ============================================================
+
+def buscar_datas_movimentacao_por_titulo(tenant_id: int) -> dict:
+    """
+    Retorna {codigo_titulo: data_movimentacao_mais_recente} a partir do raw
+    de recebimentos, já disponível na Bronze antes mesmo do transform.
+    """
+    conn = connection_mysql()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute(
+            """
+            SELECT
+                codigo,
+                MAX(data_movimentacao) AS data_movimentacao
+            FROM recebimentos_raw
+            WHERE tenant_id = %s
+            GROUP BY codigo
+            """,
+            (tenant_id,),
+        )
+
+        return {
+            row["codigo"]: row["data_movimentacao"]
+            for row in cursor.fetchall()
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
+
+# ============================================================
+# BUSCAR DATAS MAIS RECENTE
+# ============================================================
+
 def data_mais_recente(data_nova, data_banco) -> bool:
 
     def converter(valor):
@@ -78,6 +116,27 @@ def salvar_pagina_raw(
 
     return resultado_titulos
 
+# ============================================================
+# REMOVER RECEBIMENTOS
+# ============================================================
+
+SITUACOES_COM_RECEBIMENTO = {"BAIXADO", "BAIXADO PARCIAL"}
+
+def _remover_recebimentos_titulo(conn, codigo_titulo) -> None:
+    """Remove recebimentos_raw e recebimentos_bi vinculados a um título
+    que deixou de estar baixado/baixado parcial."""
+    cursor_del = conn.cursor()
+    try:
+        cursor_del.execute(
+            "DELETE FROM recebimentos_raw WHERE codigo = %s",
+            (codigo_titulo,),
+        )
+        cursor_del.execute(
+            "DELETE FROM recebimentos_bi WHERE codigo_raw = %s",
+            (codigo_titulo,),
+        )
+    finally:
+        cursor_del.close()
 
 # ============================================================
 # FINANCEIRO RAW
@@ -137,6 +196,16 @@ def upsert_financeiro_raw(registros: list[dict]) -> dict:
                     existente.get("data_baixa") if existente else None
                 )
                 or
+                data_mais_recente(
+                                    item.get("data_vencimento"),
+                                    existente.get("data_vencimento") if existente else None
+                                )
+                or
+                data_mais_recente(
+                    item.get("data_competencia"),
+                    existente.get("data_competencia") if existente else None
+                )
+                or
                 (
                     item.get("codigo_situacao") is not None
                     and existente is not None
@@ -177,6 +246,19 @@ def upsert_financeiro_raw(registros: list[dict]) -> dict:
                 else:
                     atualizados += 1
 
+                    descricao_situacao = str(
+                        item.get("descricao_situacao") or ""
+                    ).strip().upper()
+
+                    if descricao_situacao not in SITUACOES_COM_RECEBIMENTO:
+                        try:
+                            _remover_recebimentos_titulo(conn, codigo)
+                        except Exception as e_del:
+                            logger.error(
+                                "Erro ao remover recebimentos do título "
+                                f"codigo={codigo}: {e_del}"
+                            )
+
             except Exception as e:
 
                 conn.rollback()
@@ -203,7 +285,7 @@ def upsert_financeiro_raw(registros: list[dict]) -> dict:
         "ignorados": ignorados,
         "erros": erros,
     }
-
+    
 # ============================================================
 # FINANCEIRO RECEBIMENTO RAW
 # ============================================================
@@ -230,9 +312,9 @@ def upsert_financeiro_recebimento_raw(registros: list[dict]) -> dict:
 
         for i, item in enumerate(registros, start=1):
 
-            codigo = item.get("codigo")
+            codigo_recebimento = item.get("codigo_recebimento")
 
-            if not codigo:
+            if not codigo_recebimento:
                 ignorados += 1
                 continue
 
@@ -323,13 +405,16 @@ def buscar_raw_para_transform(
                 LEFT JOIN financeiro_bi fb
                     ON fb.codigo_raw = fr.codigo
                 WHERE fb.codigo_raw IS NULL
-                   OR fr.data_alteracao > fb.atualizado_em
-                   OR fr.data_baixa > fb.data_baixa
-                   OR (
+                OR fb.atualizado_em IS NULL
+                OR fr.data_alteracao > fb.atualizado_em
+                OR NOT (fr.data_baixa <=> fb.data_baixa)
+                OR NOT (fr.data_vencimento <=> fb.data_vencimento)
+                OR NOT (fr.data_competencia <=> fb.data_competencia)
+                OR (
                         fr.codigo_situacao IS NOT NULL
-                        AND fr.codigo_situacao <> fb.codigo_situacao
-                   )
-                ORDER BY fr.codigo ASC
+                        AND NOT (fr.codigo_situacao <=> fb.codigo_situacao)
+                )
+                ORDER BY fr.codigo ASC;
             """
 
         else:
@@ -348,7 +433,6 @@ def buscar_raw_para_transform(
 
         cursor.close()
         conn.close()
-
 
 # ============================================================
 # FINANCEIRO BI
@@ -407,37 +491,6 @@ def upsert_financeiro_bi(
             )
 
             existente = cursor.fetchone()
-
-            # =================================================
-            # EXISTENTE
-            # =================================================
-
-            if existente:
-
-                houve_alteracao = (
-                    data_mais_recente(
-                        item.get("data_alteracao"),
-                        existente.get("atualizado_em"),
-                    )
-                    or
-                    data_mais_recente(
-                        item.get("data_baixa"),
-                        existente.get("data_baixa"),
-                    )
-                    or
-                    (
-                        item.get("codigo_situacao") is not None
-                        and
-                        item.get("codigo_situacao")
-                        != existente.get("codigo_situacao")
-                    )
-                )
-
-                if not houve_alteracao:
-
-                    ignorados += 1
-
-                    continue
 
             # =================================================
             # UPSERT
@@ -504,8 +557,6 @@ def upsert_financeiro_bi(
 
     return {"inseridos": inseridos, "atualizados": atualizados, "ignorados": ignorados, "erros": erros}
 
-
-
 # ============================================================
 # BUSCAR RECEBIMENTOS RAW
 # ============================================================
@@ -525,7 +576,7 @@ def buscar_recebimentos_raw_para_transform(
             FROM recebimentos_raw rr
             LEFT JOIN recebimentos_bi rb
                 ON rb.tenant_id = rr.tenant_id
-               AND rb.codigo_raw = rr.codigo
+               AND rb.codigo_recebimento_raw = rr.codigo_recebimento
 
             WHERE rr.tenant_id = %s
 
@@ -540,7 +591,7 @@ def buscar_recebimentos_raw_para_transform(
                     )
               )
 
-            ORDER BY rr.codigo ASC
+            ORDER BY rr.codigo_recebimento ASC
             """,
             (tenant_id,),
         )
@@ -575,7 +626,12 @@ def transformar_recebimentos(
 
         registro = {
             "tenant_id": tenant_id,
-            "codigo_raw": codigo,
+
+            "codigo_recebimento_raw": 
+                item.get("codigo_recebimento"),
+
+            "codigo_raw": 
+                codigo,
 
             "codigo_tipo_movimentacao":
                 item.get("codigo_tipo_movimentacao"),
@@ -663,16 +719,15 @@ def upsert_recebimentos_bi(
         for i, item in enumerate(registros, start=1):
 
             tenant_id = item.get("tenant_id")
+            codigo = item.get("codigo_recebimento_raw")
             codigo_raw = item.get("codigo_raw")
-
+            
             # =================================================
             # VALIDAÇÃO
             # =================================================
 
-            if tenant_id is None:
-
+            if tenant_id is None or codigo is None or codigo_raw is None:
                 ignorados += 1
-
                 continue
 
             if codigo_raw is None:
@@ -695,10 +750,7 @@ def upsert_recebimentos_bi(
             updates = [
                 f"{coluna}=VALUES({coluna})"
                 for coluna in colunas
-                if coluna not in (
-                    "tenant_id",
-                    "codigo_raw",
-                )
+                if coluna not in ("tenant_id", "codigo", "codigo_raw")
             ]
 
             # =================================================

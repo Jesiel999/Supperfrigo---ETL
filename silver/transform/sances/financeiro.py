@@ -18,8 +18,13 @@ def _to_date(valor) -> date | None:
         return None
 
 
-def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[dict]:
+def transformar_financeiro(
+    registros_raw: list[dict],
+    tenant_id: int,
+    mapa_movimentacao: dict | None = None,
+) -> list[dict]:
 
+    mapa_movimentacao = mapa_movimentacao or {}
     resultado: list[dict] = []
     hoje = date.today()
 
@@ -30,7 +35,10 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
             data_cancelamento = _to_date(raw.get("data_cancelamento"))
             data_emissao      = _to_date(raw.get("data_emissao"))
             data_competencia  = _to_date(raw.get("data_competencia"))
-            
+
+            codigo = raw.get("codigo")
+            data_movimentacao = _to_date(mapa_movimentacao.get(codigo))
+
             descricao_situacao = str(raw.get("descricao_situacao") or "").strip().upper()
 
             if descricao_situacao in SITUACOES_TERMINAIS:
@@ -39,83 +47,61 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
                 dias_pagamento = None
                 dias_recebimento = None
             else:
-                # status_financeiro
                 if data_baixa:
                     status_financeiro = "PAGO"
                 elif data_vencimento and data_vencimento < hoje:
                     status_financeiro = "VENCIDO"
                 else:
                     status_financeiro = "EM ABERTO"
-            
-             # dias_atraso
-            dias_atraso = None
-            if data_baixa is None and data_vencimento and data_vencimento < hoje:
-                dias_atraso = (hoje - data_vencimento).days
 
-            # dias_pagamento
-            dias_pagamento = None
-            if raw.get("tipo_titulo") == "PAGAR" and data_emissao and data_baixa:
-                dias_pagamento = (data_baixa - data_emissao).days
+                dias_atraso = None
+                if data_baixa is None and data_vencimento and data_vencimento < hoje:
+                    dias_atraso = (hoje - data_vencimento).days
 
-            # dias_recebimento
-            dias_recebimento = None
-            if raw.get("tipo_titulo") == "RECEBER" and data_emissao and data_baixa:
-                dias_recebimento = (data_baixa - data_emissao).days
-                    
+                # dias_pagamento — usando data_movimentacao do recebimento
+                dias_pagamento = None
+                if raw.get("tipo_titulo") == "PAGAR" and data_emissao and data_movimentacao:
+                    dias_pagamento = (data_movimentacao - data_emissao).days
+
+                # dias_recebimento — usando data_movimentacao do recebimento
+                dias_recebimento = None
+                if raw.get("tipo_titulo") == "RECEBER" and data_emissao and data_movimentacao:
+                    dias_recebimento = (data_movimentacao - data_emissao).days
+
             bi = {
-                # ── Chave obrigatória ────────────────────────
                 "tenant_id":                   tenant_id,
-                "codigo_raw":                  raw.get("codigo"),
-
-                # ── Empresa ──────────────────────────────────
+                "codigo_raw":                  codigo,
                 "id_empresa":                  raw.get("codigo_empresa"),
-
-                # ── Pessoa ───────────────────────────────────
                 "id_pessoa":                   raw.get("codigo_pessoa"),
-
-                # ── Documento ────────────────────────────────
                 "tipo_titulo":                 raw.get("tipo_titulo"),
                 "numero_documento":            raw.get("numero_documento"),
                 "ordem":                       raw.get("ordem"),
                 "origem":                      raw.get("origem"),
-
-                # ── Situação ─────────────────────────────────
                 "codigo_situacao":             raw.get("codigo_situacao"),
                 "descricao_situacao":          raw.get("descricao_situacao"),
                 "status_financeiro":           status_financeiro,
-
-                # ── Cobrança / Pagamento ─────────────────────
                 "descricao_forma_cobranca":    raw.get("descricao_forma_cobranca"),
                 "descricao_forma_pagamento":   raw.get("descricao_forma_pagamento"),
-
-                # ── Categorização ────────────────────────────
                 "codigo_categoria_financeira":    raw.get("codigo_categoria_financeira"),
                 "descricao_categoria_financeira": raw.get("descricao_categoria_financeira"),
                 "codigo_centro_custo":            raw.get("codigo_centro_custo"),
                 "descricao_centro_custo":         raw.get("descricao_centro_custo"),
+                "numero_conta_resultado":         raw.get("numero_conta_resultado"),
                 "codigo_conta_resultado":         raw.get("codigo_conta_resultado"),
                 "descricao_conta_resultado":      raw.get("descricao_conta_resultado"),
-
-                # ── Datas ────────────────────────────────────
                 "data_emissao":                data_emissao,
                 "data_competencia":            data_competencia,
                 "data_vencimento":             data_vencimento,
                 "data_baixa":                  data_baixa,
                 "data_cancelamento":           data_cancelamento,
-
-                # ── Valores ──────────────────────────────────
                 "valor_nominal":               raw.get("valor_nominal"),
                 "valor_multa":                 raw.get("valor_multa"),
                 "acrescimo":                   raw.get("acrescimo"),
                 "valor_total":                 raw.get("valor_total"),
-
-                # ── Calculado ────────────────────────────────
                 "dias_atraso":                 dias_atraso,
                 "dias_pagamento":              dias_pagamento,
                 "dias_recebimento":            dias_recebimento,
-
-                # ── Data ──────────────────────────────────────
-                "atualizado_em":                   raw.get("data_alteracao"),
+                "atualizado_em":               raw.get("data_alteracao"),
             }
 
             resultado.append(bi)
@@ -125,16 +111,23 @@ def transformar_financeiro(registros_raw: list[dict], tenant_id: int) -> list[di
 
     return resultado
 
-
 def transformar_recebimentos(registros_raw: list[dict], tenant_id: int) -> list[dict]:
 
     resultado: list[dict] = []
 
     for raw in registros_raw:
         try:
+            codigo_recebimento = raw.get("codigo_recebimento")
+            codigo_raw = raw.get("codigo")  # código do título pai (raw)
+
+            if codigo_recebimento is None or codigo_raw is None:
+                logger.warning(f"Recebimento sem codigo_recebimento/codigo ignorado: {raw}")
+                continue
+
             bi = {
                 "tenant_id":                   tenant_id,
-                "codigo_raw":                  raw.get("codigo"),
+                "codigo_recebimento_raw":      codigo_recebimento,
+                "codigo_raw":                  codigo_raw,
                 "codigo_tipo_movimentacao":    raw.get("codigo_tipo_movimentacao"),
                 "descricao_tipo_movimentacao": raw.get("descricao_tipo_movimentacao"),
                 "valor_pago":                  raw.get("valor_pago"),
@@ -151,11 +144,11 @@ def transformar_recebimentos(registros_raw: list[dict], tenant_id: int) -> list[
                 "acrescimo":                   raw.get("acrescimo"),
                 "juros":                       raw.get("juros"),
                 "multa":                       raw.get("multa"),
-                "criado_em":                   raw.get("data_alteracao"),
+                "atualizado_em":               raw.get("data_alteracao"),   # ver ponto abaixo
             }
             resultado.append(bi)
 
         except Exception as e:
-            logger.error(f"Erro ao transformar recebimento codigo_raw={raw.get('codigo_raw')}: {e}")
+            logger.error(f"Erro ao transformar recebimento codigo_recebimento={raw.get('codigo_recebimento')} tenant={tenant_id}: {e}")
 
     return resultado
