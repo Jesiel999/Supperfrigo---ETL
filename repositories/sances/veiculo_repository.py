@@ -12,7 +12,7 @@ def garantir_veiculo_stub(tenant_id: int, veiculo_id: int) -> None:
     try:
         cursor.execute(
             """
-            INSERT IGNORE INTO veiculo_bi (id, tenant_id, codigo_econnect)
+            INSERT IGNORE INTO veiculo_bi (id, tenant_id, id_codigo)
             VALUES (%s, %s, %s)
             """,
             (veiculo_id, tenant_id, veiculo_id),
