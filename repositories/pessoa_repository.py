@@ -380,14 +380,13 @@ def upsert_pessoa_bi(registros: list[dict]) -> dict:
     sql = """
         INSERT INTO pessoa_bi
             (cpf_cnpj, id_sances, id_sults, id_multisys, id_nectar, id_econnect,
-             nome, sexo, colaborador, criado_em, atualizado_em)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+             nome, sexo, criado_em, atualizado_em)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
             id_sances = COALESCE(VALUES(id_sances), id_sances),
             id_sults = COALESCE(VALUES(id_sults), id_sults),
             nome = VALUES(nome),
             sexo = VALUES(sexo),
-            colaborador = VALUES(colaborador),
             atualizado_em = NOW()
     """
 
@@ -395,7 +394,7 @@ def upsert_pessoa_bi(registros: list[dict]) -> dict:
         (
             r.get("cpf_cnpj"), r.get("id_sances"), r.get("id_sults"),
             r.get("id_multisys"), r.get("id_nectar"), r.get("id_econnect"),
-            r.get("nome"), r.get("sexo"), r.get("colaborador", 0),
+            r.get("nome"), r.get("sexo")
         )
         for r in registros
     ]

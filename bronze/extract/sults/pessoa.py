@@ -35,9 +35,7 @@ def extrair_pessoa_sults(
             f = _filtrar_item(it)
             if f.get("id"):
                 filtrados.append(f)
-        # upsert_pessoa_sults_completo já sabe distribuir entre
-        # pessoa_sults_raw + endereco_sults_raw + empresa_sults_raw +
-        # campoAdicional_sults_raw — reaproveitado sem alteração.
+                
         upsert_pessoa_sults_completo(filtrados)
 
     return extrair_paginado_sem_filtro(
