@@ -3,12 +3,12 @@ import logging
 from core.pipeline import Pipeline
 from core.step import Step
 from database.mysql_connection import connection_mysql
-from bronze.extract.sults.chamados import extrair_chamados, ORIGEM as ORIGEM_CHAMADOS_SULTS
+from bronze.extract.sults.chamados import extrair_chamados
 from silver.transform.sults.chamados import transformar_chamados
 from config.settings import URL_CHAMADOS
 from repositories.offset_repository import ler_offset
 from repositories.tenant_repository import buscar_token_por_nome
-from repositories.sults.chamados_repository import buscar_raw_para_transform, upsert_chamados_raw, upsert_chamados_bi
+from repositories.sults.chamados_repository import buscar_raw_para_transform, upsert_chamados_bi
 from repositories.sults.chamados_apoio_repository import upsert_chamados_apoio_bi
 from repositories.sults.chamados_etiqueta_repository import upsert_chamados_etiqueta_bi, upsert_dim_etiqueta
 
@@ -135,10 +135,13 @@ class StepTransformarChamados(Step):
 def executar_pipeline_chamados(
     tenant_id: int,
     limit: int = 100,
+    origem: str | None = None,
     offset_inicial: int | None = None,
     filtros: dict | None = None,
     limite_silver_por_execucao: int = 500,
 ) -> dict:
+
+    origem = origem or f"chamados_sults"
 
     token = buscar_token_por_nome(
         "SULTS_TOKEN"
@@ -156,7 +159,7 @@ def executar_pipeline_chamados(
 
     offset = ler_offset(
         tenant_id=tenant_id,
-        origem=ORIGEM_CHAMADOS_SULTS,
+        origem=origem,
         offset_inicial=offset_inicial,
     )
 
@@ -180,7 +183,7 @@ def executar_pipeline_chamados(
             """,
             (
                 tenant_id,
-                ORIGEM_CHAMADOS_SULTS,
+                origem,
             ),
         )
 
@@ -200,7 +203,7 @@ def executar_pipeline_chamados(
         raise RuntimeError(
             "Registro pipeline_offset não encontrado "
             f"para tenant={tenant_id}, "
-            f"origem={ORIGEM_CHAMADOS_SULTS}."
+            f"origem={origem}."
         )
 
     # ---------------------------------------------------------
@@ -245,7 +248,7 @@ def executar_pipeline_chamados(
                 offset,
 
             "origem":
-                ORIGEM_CHAMADOS_SULTS,
+                origem,
 
             "endpoint":
                 URL_CHAMADOS,
