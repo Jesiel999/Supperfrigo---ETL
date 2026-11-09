@@ -1,4 +1,5 @@
 import time
+import gc
 import logging
 import requests
 
@@ -12,10 +13,12 @@ class RateLimitAtingido(Exception):
     pass
 
 
-def _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger):
+def _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger, max_tentativas=5):
     response = None
+    tentativa = 0
 
     while True:
+        tentativa += 1
         try:
             response = requests.get(url, headers=headers, params=params, timeout=timeout)
             # logger.info(f"[{origem}] GET {response.url} -> {response.status_code}")
@@ -32,18 +35,23 @@ def _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger
             salvar_offset(tenant_id, origem, offset)
             return None
 
-        except Timeout:
-            logger.warning(f"[{origem}] Timeout na página {offset}. Aguardando 5s e tentando de novo...")
-            time.sleep(5)
+        except RequestException as e:      # inclui Timeout e ConnectionError
+            if tentativa >= max_tentativas:
+                logger.error(
+                    f"[{origem}] Página {offset}: {type(e).__name__} após {tentativa} tentativas. "
+                    f"Desistindo; offset salvo para retomada."
+                )
+                salvar_offset(tenant_id, origem, offset)
+                return None
 
-        except ConnectionError:
-            logger.warning(f"[{origem}] Erro de conexão na página {offset}. Aguardando 5s...")
-            time.sleep(5)
+            espera = min(5 * 2 ** (tentativa - 1), 60)
+            logger.warning(
+                f"[{origem}] {type(e).__name__} na página {offset} "
+                f"(tentativa {tentativa}/{max_tentativas}). Aguardando {espera}s..."
+            )
+            time.sleep(espera)
 
-        except RequestException as e:
-            logger.error(f"[{origem}] Erro de request inesperado na página {offset}: {e}")
-            time.sleep(5)
-
+    # ── daqui para baixo: fora do loop, só depois do 200 ──────────────
     try:
         corpo = response.json()
     except Exception as e:
@@ -53,10 +61,22 @@ def _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger
 
     if isinstance(corpo, list):
         return corpo
-    if isinstance(corpo, dict):
-        return corpo.get("dados", [])
 
-    # logger.error(f"[{origem}] Formato de resposta inesperado na página {offset}: {type(corpo)}")
+    if isinstance(corpo, dict):
+        if corpo.get("sucesso") is False:
+            logger.error(
+                f"[{origem}] API sucesso=false na página {offset}: "
+                f"{corpo.get('mensagemUsuarioFinal')}"
+            )
+            salvar_offset(tenant_id, origem, offset)
+            return None
+
+        dados = corpo.get("dados", [])
+        if isinstance(dados, dict):          # formato antigo: dados dentro de dados
+            dados = dados.get("dados", [])
+        return dados
+
+    logger.error(f"[{origem}] Formato de resposta inesperado na página {offset}: {type(corpo)}")
     salvar_offset(tenant_id, origem, offset)
     return None
 
@@ -72,10 +92,11 @@ def extrair_paginado(
     limit: int = 100,
     offset_inicial: int | None = None,
     extra_params: dict | None = None,
-    timeout: int = 30,
+    timeout=(10, 120),
     sleep_request: float = 1.0,
     nome_param_pagina: str = "offset",
     valor_padrao_pagina: int = 1,
+    max_tentativas: int = 5,
     on_page=None,
 ) -> list[dict]:
     """
@@ -128,60 +149,92 @@ def extrair_paginado_sem_filtro(
     headers: dict,
     origem: str,
     tenant_id: int,
-    on_page,  
+    on_page,
     logger: logging.Logger,
     limit: int = 100,
     offset_inicial: int | None = None,
     extra_params: dict | None = None,
-    timeout: int = 30,
+    timeout=(10, 120),
     sleep_request: float = 1.0,
     nome_param_pagina: str = "offset",
+    nome_param_limite: str = "limit",
     valor_padrao_pagina: int = 1,
+    max_tentativas: int = 5,
 ) -> dict:
+    """
+    Extrai página a página e entrega cada página ao on_page (que grava no banco).
+    NADA é acumulado em memória: só contadores são mantidos.
+
+    Mesmo contrato do extrair_paginado:
+      - o parâmetro de página avança de 1 em 1 (NÃO de `limit` em `limit`);
+      - rate limit / falha HTTP: offset salvo para retomada;
+      - página vazia: offset resetado (próxima execução recomeça).
+    """
     params_extra = extra_params.copy() if extra_params else {}
     offset = ler_offset(tenant_id, origem, offset_inicial, valor_padrao=valor_padrao_pagina)
+
     paginas = 0
     total_registros = 0
+    status = "OK"
+    mensagem = None
 
     while True:
-        params = {"limit": limit, nome_param_pagina: offset, **params_extra}
+        params = {nome_param_limite: limit, nome_param_pagina: offset, **params_extra}
 
         try:
-            dados = _fetch_page(url, headers, params, timeout, offset, tenant_id, origem, logger)
-        except RateLimitAtingido:
-
-            #logger.warning(f"[{origem}] Extração interrompida por rate limit na página {offset}.")
-            return {"paginas": paginas, "registros": total_registros, "status": "RATE_LIMIT"}
+            dados = _fetch_page(
+                url, headers, params, timeout, offset,
+                tenant_id, origem, logger, max_tentativas,
+            )
+        except RateLimitAtingido as exc:
+            status = "RATE_LIMIT"
+            mensagem = str(exc)
+            break
 
         if dados is None:
-            # logger.warning(f"[{origem}] Extração encerrada com falha na página {offset}. Offset NÃO avançado.")
+            status = "ERRO"
+            mensagem = f"Falha ao buscar a página {offset}. Offset salvo para retomada."
+            break
 
-            return {"paginas": paginas, "registros": total_registros, "status": "ERRO"}
-
-        qtd = len(dados)
-
-        # Fim da paginação: página sem registros.
-        if qtd == 0:
-
-            # logger.info(f"[{origem}] Página {offset} vazia — fim dos registros. Total: {total_registros}")
-
+        # Lista vazia = fim dos dados.
+        if not dados:
             resetar_offset(tenant_id, origem, valor_padrao=valor_padrao_pagina)
-            return {"paginas": paginas, "registros": total_registros, "status": "CONCLUIDO"}
+            break
 
-        try:
-            on_page(dados, offset, limit)
-        except Exception as e:
-            logger.error(f"[{origem}] Falha ao persistir página {offset} na Bronze: {e}. Offset NÃO avançado.")
-            return {"paginas": paginas, "registros": total_registros, "status": "ERRO"}
+        # defesa: só dicts seguem para o repository
+        itens = [i for i in dados if isinstance(i, dict)]
+        qtd = len(itens)
 
-        # logger.info(f"[{origem}] Página {offset}: {qtd} registros persistidos na Bronze.")
+        # Se `recebidos` vier muito acima de `limit`, a API está ignorando
+        # o limite e devolvendo tudo de uma vez (causa clássica de estouro de RAM).
+        logger.info("[%s] tenant=%s pagina=%s recebidos=%s", origem, tenant_id, offset, qtd)
+
+        if itens:
+            on_page(itens, offset, limit)
+
+        # Salva progresso e avança — se o processo morrer, não perde a página atual.
+        salvar_offset(tenant_id, origem, offset)
 
         paginas += 1
         total_registros += qtd
-
-        salvar_offset(tenant_id, origem, offset)
-        time.sleep(sleep_request)
         offset += 1
+
+        # solta a página antes de buscar a próxima
+        del dados, itens
+        if paginas % 20 == 0:
+            gc.collect()
+
+        time.sleep(sleep_request)
+
+    return {
+        "status": status,
+        "mensagem": mensagem,
+        "paginas": paginas,
+        "registros": total_registros,
+        "itens": total_registros,
+        "total_registros": total_registros,
+        "offset_final": offset,
+    }
 
 
 def _fetch_um(url, headers, timeout, codigo, tenant_id, origem, logger):
@@ -258,12 +311,12 @@ def extrair_por_codigo(
 
         try:
             item = _fetch_um(
-                url, 
-                headers, 
-                timeout, 
-                codigo, 
-                tenant_id, 
-                origem, 
+                url,
+                headers,
+                timeout,
+                codigo,
+                tenant_id,
+                origem,
                 logger
             )
 
@@ -281,32 +334,32 @@ def extrair_por_codigo(
             nao_encontrados_seguidos += 1
 
             if nao_encontrados_seguidos >= max_nao_encontrados_seguidos:
-                
+
                 codigo += 1
-                
+
                 salvar_offset(
-                    tenant_id, 
-                    origem, 
+                    tenant_id,
+                    origem,
                     codigo
                 )
-                
+
                 break
         else:
 
             nao_encontrados_seguidos = 0
 
             filtrado = {campo: item.get(campo) for campo in campos_permitidos}
-            
+
             todos_registros.append(filtrado)
 
             if on_registro:
-                on_registro(filtrado)
-                
+                on_registro(filtrado, codigo)
+
         codigo += 1
 
         salvar_offset(
-            tenant_id, 
-            origem, 
+            tenant_id,
+            origem,
             codigo
         )
 
