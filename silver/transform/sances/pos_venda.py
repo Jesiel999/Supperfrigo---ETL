@@ -111,7 +111,6 @@ def _montar_bi(raw: dict, tenant_id: int) -> dict:
 
 
 def _limpar_filhos(linhas: list[dict]) -> list[dict]:
-    """Remove colunas de controle do raw; mantém 'seq' (chave do upsert)."""
     limpas = []
     for linha in linhas:
         linha = dict(linha)
@@ -140,8 +139,6 @@ def processar_um_pos_venda(
     # 2. Processa uma tabela filha por vez.
     for tabela_raw, tabela_bi in MAPEAMENTO_FILHOS.items():
 
-        ultimo_seq = -1
-
         while True:
 
             linhas = buscar_filhos_lote(
@@ -149,14 +146,10 @@ def processar_um_pos_venda(
                 codigo=codigo,
                 tabela=tabela_raw,
                 limite=tamanho_lote_filhos,
-                ultimo_seq=ultimo_seq,
             )
 
             if not linhas:
-                break
-
-            # O último seq será utilizado na próxima consulta.
-            ultimo_seq = linhas[-1]["seq"]
+                brea
 
             # Remove somente os campos de controle do raw.
             filhos = _limpar_filhos(linhas)
@@ -226,7 +219,7 @@ def processar_pos_venda_pendentes(
 
                 marcar_processado(
                     tenant_id=tenant_id,
-                    registros=[(raw["id"], raw.get("hash_registro"))],
+                    registros=[raw["id"]],
                 )
 
                 total += 1

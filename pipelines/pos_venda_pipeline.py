@@ -67,7 +67,7 @@ class StepTransformarPosVenda(Step):
     
 def executar_pipeline_pos_venda(
     tenant_id: int,
-    limit: int = 100,
+    limit: int = 50,
     offset_inicial: int | None = None,
     filtros: dict | None = None,
     limite_silver_por_execucao: int | None = None,

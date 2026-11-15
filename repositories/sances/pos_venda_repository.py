@@ -1,4 +1,3 @@
-import hashlib
 import json
 import logging
 from datetime import datetime
@@ -48,21 +47,6 @@ def _booleano_mysql(valor, padrao=0) -> int:
         ) else 0
 
     return 1 if valor else 0
-
-
-def _hash_item(item: dict) -> str:
-    """
-    Hash do item inteiro devolvido pela API (principal + filhos).
-    Se o hash não mudou, nada mudou: o item é ignorado.
-    """
-    return hashlib.sha256(
-        json.dumps(
-            item,
-            sort_keys=True,
-            default=str,
-            ensure_ascii=False,
-        ).encode("utf-8")
-    ).hexdigest()
 
 
 # ============================================================
@@ -166,7 +150,6 @@ def _linha_pos_venda_raw(
         "tenant_id": tenant_id,
         "codigo": codigo,
         "atualizado_em": agora,
-        "hash_registro": _hash_item(item),
     }
 
     for campo in CAMPOS_DIRETOS:
@@ -181,32 +164,7 @@ def _linha_pos_venda_raw(
     return linha
 
 
-def _hashes_existentes(cursor, tenant_id: int, codigos: list) -> dict:
-    """Hashes já gravados para os códigos da página (1 query por página)."""
-    if not codigos:
-        return {}
-
-    placeholders = ", ".join(["%s"] * len(codigos))
-
-    cursor.execute(
-        f"""
-        SELECT codigo, hash_registro
-        FROM pos_venda_raw
-        WHERE tenant_id = %s
-          AND codigo IN ({placeholders})
-        """,
-        (tenant_id, *codigos),
-    )
-
-    return {codigo: h for codigo, h in cursor.fetchall()}
-
-
 def _upsert_principal(cursor, dados: dict) -> None:
-    """
-    UPSERT do registro principal.
-    Se o hash mudou, processado_em volta para NULL e o silver
-    reprocessa SOMENTE este registro.
-    """
     colunas = list(dados.keys())
 
     colunas_sql = ", ".join(f"`{c}`" for c in colunas)
@@ -215,23 +173,18 @@ def _upsert_principal(cursor, dados: dict) -> None:
     updates = [
         f"`{c}`=VALUES(`{c}`)"
         for c in colunas
-        if c not in ("tenant_id", "codigo", "hash_registro")
+        if c not in ("tenant_id", "codigo")
     ]
 
-    # ATENÇÃO: processado_em precisa vir ANTES de hash_registro.
-    # O MySQL avalia as atribuições da esquerda para a direita; aqui
-    # ele ainda enxerga o hash antigo.
     sql = f"""
         INSERT INTO `pos_venda_raw` ({colunas_sql})
         VALUES ({placeholders})
         ON DUPLICATE KEY UPDATE
             `processado_em` = IF(
-                `hash_registro` <=> VALUES(`hash_registro`),
                 `processado_em`,
                 NULL
             ),
             {", ".join(updates)},
-            `hash_registro` = VALUES(`hash_registro`)
     """
 
     cursor.execute(sql, tuple(dados.values()))
@@ -321,14 +274,14 @@ def _inserir_filhos(
     datas_br: tuple = (),
 ) -> None:
     """
-    UPSERT incremental dos filhos pela chave (tenant_id, codposv, seq).
+    UPSERT incremental dos filhos pela chave (tenant_id, codposv, tipo).
     Não apaga nada: linhas existentes são atualizadas no lugar.
     """
 
     if not linhas:
         return
 
-    colunas = ["tenant_id", "codigo", "codposv", "seq", *campos]
+    colunas = ["tenant_id", "codigo", "codposv", *campos]
 
     colunas_sql = ", ".join(f"`{c}`" for c in colunas)
     placeholders = ", ".join(["%s"] * len(colunas))
@@ -359,17 +312,15 @@ def _inserir_filhos(
             tenant_id,
             codigo_origem,
             codigo_origem,
-            seq,
             *[normalizar_valor(linha, campo) for campo in campos],
         )
-        for seq, linha in enumerate(linhas)
+        for linha in enumerate(linhas)
     ]
 
     cursor.executemany(sql, valores)
 
 
 def _montar_parcelas(item: dict) -> list[dict]:
-    """Junta as 3 listas de parcelas em ordem fixa (define o seq)."""
     parcelas = []
 
     for chave, tipo in (
@@ -446,8 +397,6 @@ def salvar_pagina_raw(
             if i.get("codigo") is not None
         ]
 
-        hashes = _hashes_existentes(cursor, tenant_id, codigos)
-
         gravados = 0
         ignorados = 0
 
@@ -469,11 +418,6 @@ def salvar_pagina_raw(
                 item,
                 agora,
             )
-
-            # Nada mudou na API: não toca no principal nem nos filhos.
-            if hashes.get(codigo_origem) == dados["hash_registro"]:
-                ignorados += 1
-                continue
 
             _upsert_principal(cursor, dados)
             _salvar_filhos_item(cursor, tenant_id, codigo_origem, item)
@@ -579,13 +523,11 @@ def buscar_filhos_lote(
     codigo: int,
     tabela: str,
     limite: int = 200,
-    ultimo_seq: int = -1,
 ) -> list[dict]:
     """
     Busca um lote de filhos de um único pós-venda.
 
     Não carrega todos os filhos na memória.
-    Utiliza seq para paginação incremental.
     """
 
     tabelas_permitidas = {
@@ -610,11 +552,9 @@ def buscar_filhos_lote(
                 FROM `{tabela}`
                 WHERE tenant_id = %s
                   AND codposv = %s
-                  AND seq > %s
-                ORDER BY seq
                 LIMIT %s
             """,
-            (tenant_id, codigo, ultimo_seq, limite),
+            (tenant_id, codigo, limite),
         )
 
         return cursor.fetchall()
@@ -625,9 +565,11 @@ def buscar_filhos_lote(
         
 def marcar_processado(
     tenant_id: int,
-    registros: list[tuple],
+    registros: list[int],
 ) -> None:
-
+    """
+    Marca individualmente os registros processados na Silver.
+    """
     if not registros:
         return
 
@@ -637,16 +579,15 @@ def marcar_processado(
     try:
         cursor.executemany(
             """
-                UPDATE pos_venda_raw
-                SET processado_em = NOW()
-                WHERE tenant_id = %s
-                  AND id = %s
-                  AND hash_registro <=> %s
-                  AND processado_em IS NULL
+            UPDATE pos_venda_raw
+            SET processado_em = NOW()
+            WHERE tenant_id = %s
+              AND id = %s
+              AND processado_em IS NULL
             """,
             [
-                (tenant_id, registro_id, hash_registro)
-                for registro_id, hash_registro in registros
+                (tenant_id, registro_id)
+                for registro_id in registros
             ],
         )
 
@@ -654,6 +595,10 @@ def marcar_processado(
 
     except Exception:
         conn.rollback()
+        logger.exception(
+            "Erro ao marcar pós-venda processado: tenant=%s",
+            tenant_id,
+        )
         raise
 
     finally:
@@ -807,7 +752,6 @@ def upsert_pos_venda_bi_filhos(
         "codigo",
         "codigo_posvenda",
         "codigo_origem",
-        "seq",
         *campos,
         "data_carga",
     ]
@@ -834,7 +778,6 @@ def upsert_pos_venda_bi_filhos(
             codigo_origem,
             codigo_origem,
             codigo_origem,
-            linha["seq"],
             *[linha.get(campo) for campo in campos],
             agora,
         )
