@@ -175,10 +175,10 @@ def buscar_raw_para_transform(
                 FROM veiculo_estoque_raw er
                 LEFT JOIN veiculo_estoque_bi eb
                     ON eb.tenant_id = er.tenant_id
-                   AND eb.codigo_raw = er.codigo
+                   AND eb.codigo_origem = er.codigo
                 WHERE er.tenant_id = %s
                   AND (
-                        eb.codigo_raw IS NULL
+                        eb.codigo_origem IS NULL
                      OR er.atualizado_raw_em > eb.processado_em
                      OR er.ativo_no_estoque = 1
                   )
@@ -217,7 +217,7 @@ def upsert_veiculo_estoque_bi(registros: list[dict]) -> dict:
     return _upsert(
         tabela="veiculo_estoque_bi",
         registros=registros,
-        chave="codigo_raw",
-        excluir_update=("tenant_id", "codigo_raw"),
+        chave="codigo_origem",
+        excluir_update=("tenant_id", "codigo_origem"),
         extra_update="processado_em = NOW()",
     )

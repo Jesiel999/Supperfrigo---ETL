@@ -70,7 +70,7 @@ def transformar_financeiro(
 
             bi = {
                 "tenant_id":                   tenant_id,
-                "codigo_raw":                  codigo,
+                "codigo_origem":                  codigo,
                 "id_empresa":                  raw.get("codigo_empresa"),
                 "id_pessoa":                   raw.get("codigo_pessoa"),
                 "tipo_titulo":                 raw.get("tipo_titulo"),
@@ -118,16 +118,16 @@ def transformar_recebimentos(registros_raw: list[dict], tenant_id: int) -> list[
     for raw in registros_raw:
         try:
             codigo_recebimento = raw.get("codigo_recebimento")
-            codigo_raw = raw.get("codigo")  # código do título pai (raw)
+            codigo_origem = raw.get("codigo")  # código do título pai (raw)
 
-            if codigo_recebimento is None or codigo_raw is None:
+            if codigo_recebimento is None or codigo_origem is None:
                 logger.warning(f"Recebimento sem codigo_recebimento/codigo ignorado: {raw}")
                 continue
 
             bi = {
                 "tenant_id":                   tenant_id,
                 "codigo_recebimento_raw":      codigo_recebimento,
-                "codigo_raw":                  codigo_raw,
+                "codigo_origem":                  codigo_origem,
                 "codigo_tipo_movimentacao":    raw.get("codigo_tipo_movimentacao"),
                 "descricao_tipo_movimentacao": raw.get("descricao_tipo_movimentacao"),
                 "valor_pago":                  raw.get("valor_pago"),

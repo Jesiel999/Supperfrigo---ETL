@@ -10,7 +10,7 @@ logger = get_layer_logger("silver", "telemetria_transform")
 def _montar_bi(raw: dict, tenant_id: int) -> dict:
     return {
         "tenant_id": tenant_id,
-        "codigo_raw": raw["id"],
+        "codigo_origem": raw["id"],
         "dispositivo_id": raw.get("dispositivo_id"),
         "veiculo_id": raw["veiculo_id"],
         "data_evento": raw["data_evento"],
@@ -55,7 +55,7 @@ def _upsert_telemetria_bi(bi: dict) -> None:
     try:
         colunas = list(bi.keys())
         placeholders = [f"%({c})s" for c in colunas]
-        updates = [f"{c}=VALUES({c})" for c in colunas if c != "codigo_raw"]
+        updates = [f"{c}=VALUES({c})" for c in colunas if c != "codigo_origem"]
         cursor.execute(
             f"""
             INSERT INTO telemetria_bi ({', '.join(colunas)})

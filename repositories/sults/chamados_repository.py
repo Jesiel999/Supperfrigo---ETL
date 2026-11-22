@@ -141,7 +141,7 @@ def buscar_raw_para_transform(
 def upsert_chamados_bi(registros: list[dict]) -> dict:
     """
     Insere ou atualiza registros na tabela chamados_bi.
-    Usa codigo_raw como chave única.
+    Usa codigo_origem como chave única.
     Faz commit a cada 500 registros.
     """
     if not registros:
@@ -158,21 +158,21 @@ def upsert_chamados_bi(registros: list[dict]) -> dict:
 
     try:
         for i, item in enumerate(registros, start=1):
-            codigo_raw = item.get("codigo_raw")
-            if not codigo_raw:
-                # logger.warning(f"Registro sem codigo_raw — ignorado: {item}")
+            codigo_origem = item.get("codigo_origem")
+            if not codigo_origem:
+                # logger.warning(f"Registro sem codigo_origem — ignorado: {item}")
                 continue
 
             # Verifica se já existe para contar corretamente INSERT vs UPDATE
             cursor.execute(
-                "SELECT id FROM chamados_bi WHERE codigo_raw = %s",
-                (codigo_raw,),
+                "SELECT id FROM chamados_bi WHERE codigo_origem = %s",
+                (codigo_origem,),
             )
             existe = cursor.fetchone()
 
             colunas      = list(item.keys())
             placeholders = [f"%({c})s" for c in colunas]
-            updates      = [f"{c}=VALUES({c})" for c in colunas if c != "codigo_raw"]
+            updates      = [f"{c}=VALUES({c})" for c in colunas if c != "codigo_origem"]
 
             sql = f"""
                 INSERT INTO chamados_bi ({', '.join(colunas)})
@@ -193,7 +193,7 @@ def upsert_chamados_bi(registros: list[dict]) -> dict:
             except Exception as e:
                 conn.rollback()
                 erros += 1
-                # logger.error(f"Erro upsert bi codigo_raw={codigo_raw}: {e}")
+                # logger.error(f"Erro upsert bi codigo_origem={codigo_origem}: {e}")
 
             if i % BATCH_COMMIT == 0:
                 conn.commit()

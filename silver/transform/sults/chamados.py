@@ -110,7 +110,7 @@ def transformar_chamados(
                     horas_atrasado = horas_resolver
             
             chamado_bi = {
-                "codigo_raw": codigo,
+                "codigo_origem": codigo,
                 "titulo": raw.get("titulo"),
                 
                 # Relacionamentos

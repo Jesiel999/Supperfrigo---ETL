@@ -98,7 +98,7 @@ def transformar_estoque_veiculos(registros_raw: list[dict], tenant_id: int) -> l
 
             bi = {
                 "tenant_id":                tenant_id,
-                "codigo_raw":               codigo,
+                "codigo_origem":               codigo,
                 "id_empresa":               raw.get("codigo_empresa"),
                 "nome_empresa":             raw.get("nome_empresa"),
 

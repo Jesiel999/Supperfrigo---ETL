@@ -101,7 +101,7 @@ def _filtrar_item(item: dict) -> dict:
 
     return {k: v for k, v in item.items() if k in CAMPOS_PERMITIDOS}
 
-def _extrair_recebimentos(item: dict, codigo_raw, tenant_id: int) -> list[dict]:
+def _extrair_recebimentos(item: dict, codigo_origem, tenant_id: int) -> list[dict]:
 
     recebimentos = item.get("recebimentos") or []
     linhas = []
@@ -115,7 +115,7 @@ def _extrair_recebimentos(item: dict, codigo_raw, tenant_id: int) -> list[dict]:
         linhas.append({
             "tenant_id": tenant_id,
             "codigo_recebimento": codigo_recebimento,    
-            "codigo": codigo_raw,                       
+            "codigo": codigo_origem,                       
             "codigo_tipo_movimentacao": r.get("codigo_tipo_movimentacao"),
             "descricao_tipo_movimentacao": r.get("descricao_tipo_movimentacao"),
             "valor_pago": r.get("valor_pago"),

@@ -132,7 +132,7 @@ def _remover_recebimentos_titulo(conn, codigo_titulo) -> None:
             (codigo_titulo,),
         )
         cursor_del.execute(
-            "DELETE FROM slv_financeiro_recebimento WHERE codigo_raw = %s",
+            "DELETE FROM slv_financeiro_recebimento WHERE codigo_origem = %s",
             (codigo_titulo,),
         )
     finally:
@@ -462,13 +462,13 @@ def upsert_slv_financeiro_titulo(
 
         for i, item in enumerate(registros, start=1):
 
-            codigo_raw = item.get("codigo_raw")
+            codigo_origem = item.get("codigo_origem")
 
             # ------------------------------------------------
             # Validação
             # ------------------------------------------------
 
-            if not codigo_raw:
+            if not codigo_origem:
 
                 ignorados += 1
                 continue
@@ -480,14 +480,14 @@ def upsert_slv_financeiro_titulo(
             cursor.execute(
                 """
                 SELECT
-                    codigo_raw,
+                    codigo_origem,
                     atualizado_em,
                     data_baixa,
                     codigo_situacao
                 FROM slv_financeiro_titulo
-                WHERE codigo_raw = %s
+                WHERE codigo_origem = %s
                 """,
-                (codigo_raw,),
+                (codigo_origem,),
             )
 
             existente = cursor.fetchone()
@@ -506,7 +506,7 @@ def upsert_slv_financeiro_titulo(
             updates = [
                 f"{coluna}=VALUES({coluna})"
                 for coluna in colunas
-                if coluna != "codigo_raw"
+                if coluna != "codigo_origem"
             ]
 
             sql = f"""
@@ -581,13 +581,13 @@ def buscar_brz_sances_financeiro_recebimento_para_transform(
             WHERE rr.tenant_id = %s
 
               AND (
-                    rb.codigo_raw IS NULL
+                    rb.codigo_origem IS NULL
 
                     OR rr.data_alteracao > rb.atualizado_em
 
                     OR (
                         rr.data_alteracao IS NULL
-                        AND rb.codigo_raw IS NULL
+                        AND rb.codigo_origem IS NULL
                     )
               )
 
@@ -630,7 +630,7 @@ def transformar_recebimentos(
             "codigo_recebimento_raw": 
                 item.get("codigo_recebimento"),
 
-            "codigo_raw": 
+            "codigo_origem": 
                 codigo,
 
             "codigo_tipo_movimentacao":
@@ -720,17 +720,17 @@ def upsert_slv_financeiro_recebimento(
 
             tenant_id = item.get("tenant_id")
             codigo = item.get("codigo_recebimento_raw")
-            codigo_raw = item.get("codigo_raw")
+            codigo_origem = item.get("codigo_origem")
             
             # =================================================
             # VALIDAÇÃO
             # =================================================
 
-            if tenant_id is None or codigo is None or codigo_raw is None:
+            if tenant_id is None or codigo is None or codigo_origem is None:
                 ignorados += 1
                 continue
 
-            if codigo_raw is None:
+            if codigo_origem is None:
 
                 ignorados += 1
 
@@ -750,7 +750,7 @@ def upsert_slv_financeiro_recebimento(
             updates = [
                 f"{coluna}=VALUES({coluna})"
                 for coluna in colunas
-                if coluna not in ("tenant_id", "codigo", "codigo_raw")
+                if coluna not in ("tenant_id", "codigo", "codigo_origem")
             ]
 
             # =================================================
