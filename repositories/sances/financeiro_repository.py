@@ -380,7 +380,7 @@ def upsert_financeiro_recebimento_raw(registros: list[dict]) -> dict:
 # ============================================================
 
 def buscar_raw_para_transform(
-    somente_nao_transformados: bool = True,
+    somente_nao_transformados: bool = False,
 ) -> list[dict]:
 
     conn = connection_mysql()
