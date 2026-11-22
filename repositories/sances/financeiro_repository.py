@@ -583,10 +583,10 @@ def buscar_brz_sances_financeiro_recebimento_para_transform(
               AND (
                     rb.codigo_raw IS NULL
 
-                    OR rr.data_alteracao > rb.atualizado_em
+                    OR rr.atualizado_em > rb.atualizado_em
 
                     OR (
-                        rr.data_alteracao IS NULL
+                        rr.atualizado_em IS NULL
                         AND rb.codigo_raw IS NULL
                     )
               )
