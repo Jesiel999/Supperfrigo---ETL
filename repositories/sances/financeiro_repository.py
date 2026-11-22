@@ -394,8 +394,8 @@ def buscar_raw_para_transform(
                 SELECT fr.*
                 FROM brz_sances_financeiro_titulo fr
                 LEFT JOIN slv_financeiro_titulo fb
-                    ON fb.codigo_raw = fr.codigo
-                WHERE fb.codigo_raw IS NULL
+                    ON fb.codigo_origem = fr.codigo
+                WHERE fb.codigo_origem IS NULL
                    OR data_mais_recente
             """
 
@@ -403,8 +403,8 @@ def buscar_raw_para_transform(
                 SELECT fr.*
                 FROM brz_sances_financeiro_titulo fr
                 LEFT JOIN slv_financeiro_titulo fb
-                    ON fb.codigo_raw = fr.codigo
-                WHERE fb.codigo_raw IS NULL
+                    ON fb.codigo_origem = fr.codigo
+                WHERE fb.codigo_origem IS NULL
                 OR fb.atualizado_em IS NULL
                 OR fr.data_alteracao > fb.atualizado_em
                 OR NOT (fr.data_baixa <=> fb.data_baixa)
