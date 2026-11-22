@@ -15,7 +15,7 @@ ETL/
 │   ├── mysql_connection.py
 │   └── schemas/
 │       ├── bronze/brz_sances_financeiro_titulo.sql
-│       └── silver/financeiro_bi.sql
+│       └── silver/slv_financeiro_titulo.sql
 ├── bronze/extract/sances/financeiro.py
 ├── silver/transform/financeiro/financeiro.py
 ├── gold/
@@ -132,7 +132,7 @@ brz_sances_financeiro_titulo
       │ Extração dos dados
       ▼
 SILVER
-financeiro_bi
+slv_financeiro_titulo
       │
       │ Transformação
       │ Normalização

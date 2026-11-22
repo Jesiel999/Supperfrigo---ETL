@@ -7,7 +7,7 @@ from bronze.extract.sances.financeiro import extrair_financeiro_sances
 from silver.transform.sances.financeiro import transformar_financeiro, transformar_recebimentos
 from config.settings import URL_SANCES_FINANCEIRO, REQUEST_TIMEOUT, RATE_LIMIT_SLEEP, SLEEP_REQUEST
 from repositories.offset_repository import ler_offset
-from repositories.sances.financeiro_repository import buscar_raw_para_transform, upsert_financeiro_bi, buscar_brz_sances_financeiro_recebimento_para_transform, upsert_recebimentos_bi, buscar_datas_movimentacao_por_titulo
+from repositories.sances.financeiro_repository import buscar_raw_para_transform, upsert_slv_financeiro_titulo, buscar_brz_sances_financeiro_recebimento_para_transform, upsert_slv_financeiro_recebimento, buscar_datas_movimentacao_por_titulo
 from repositories.tenant_repository import buscar_token_por_nome
 
 logger = logging.getLogger(__name__)
@@ -66,12 +66,12 @@ class StepTransformarFinanceiro(Step):
             tenant_id=tenant_id,
             mapa_movimentacao=mapa_movimentacao,
         )
-        resultado = upsert_financeiro_bi(registros_bi)
+        resultado = upsert_slv_financeiro_titulo(registros_bi)
         context["silver_financeiro_resultado"] = resultado
 
         brz_sances_financeiro_recebimento = buscar_brz_sances_financeiro_recebimento_para_transform(tenant_id)
-        recebimentos_bi = transformar_recebimentos(brz_sances_financeiro_recebimento, tenant_id=tenant_id)
-        resultado_recebimentos = upsert_recebimentos_bi(recebimentos_bi)
+        slv_financeiro_recebimento = transformar_recebimentos(brz_sances_financeiro_recebimento, tenant_id=tenant_id)
+        resultado_recebimentos = upsert_slv_financeiro_recebimento(slv_financeiro_recebimento)
         context["silver_recebimentos_resultado"] = resultado_recebimentos
 
         return context

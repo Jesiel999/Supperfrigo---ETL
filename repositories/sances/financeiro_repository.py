@@ -123,7 +123,7 @@ def salvar_pagina_raw(
 SITUACOES_COM_RECEBIMENTO = {"BAIXADO", "BAIXADO PARCIAL"}
 
 def _remover_recebimentos_titulo(conn, codigo_titulo) -> None:
-    """Remove brz_sances_financeiro_recebimento e recebimentos_bi vinculados a um título
+    """Remove brz_sances_financeiro_recebimento e slv_financeiro_recebimento vinculados a um título
     que deixou de estar baixado/baixado parcial."""
     cursor_del = conn.cursor()
     try:
@@ -132,7 +132,7 @@ def _remover_recebimentos_titulo(conn, codigo_titulo) -> None:
             (codigo_titulo,),
         )
         cursor_del.execute(
-            "DELETE FROM recebimentos_bi WHERE codigo_raw = %s",
+            "DELETE FROM slv_financeiro_recebimento WHERE codigo_raw = %s",
             (codigo_titulo,),
         )
     finally:
@@ -393,7 +393,7 @@ def buscar_raw_para_transform(
             sql = """
                 SELECT fr.*
                 FROM brz_sances_financeiro_titulo fr
-                LEFT JOIN financeiro_bi fb
+                LEFT JOIN slv_financeiro_titulo fb
                     ON fb.codigo_raw = fr.codigo
                 WHERE fb.codigo_raw IS NULL
                    OR data_mais_recente
@@ -402,7 +402,7 @@ def buscar_raw_para_transform(
             sql = """
                 SELECT fr.*
                 FROM brz_sances_financeiro_titulo fr
-                LEFT JOIN financeiro_bi fb
+                LEFT JOIN slv_financeiro_titulo fb
                     ON fb.codigo_raw = fr.codigo
                 WHERE fb.codigo_raw IS NULL
                 OR fb.atualizado_em IS NULL
@@ -438,7 +438,7 @@ def buscar_raw_para_transform(
 # FINANCEIRO BI
 # ============================================================
 
-def upsert_financeiro_bi(
+def upsert_slv_financeiro_titulo(
     registros: list[dict],
 ) -> dict:
 
@@ -484,7 +484,7 @@ def upsert_financeiro_bi(
                     atualizado_em,
                     data_baixa,
                     codigo_situacao
-                FROM financeiro_bi
+                FROM slv_financeiro_titulo
                 WHERE codigo_raw = %s
                 """,
                 (codigo_raw,),
@@ -510,7 +510,7 @@ def upsert_financeiro_bi(
             ]
 
             sql = f"""
-                INSERT INTO financeiro_bi (
+                INSERT INTO slv_financeiro_titulo (
                     {', '.join(colunas)}
                 )
                 VALUES (
@@ -574,7 +574,7 @@ def buscar_brz_sances_financeiro_recebimento_para_transform(
             """
             SELECT rr.*
             FROM brz_sances_financeiro_recebimento rr
-            LEFT JOIN recebimentos_bi rb
+            LEFT JOIN slv_financeiro_recebimento rb
                 ON rb.tenant_id = rr.tenant_id
                AND rb.codigo_recebimento_raw = rr.codigo_recebimento
 
@@ -693,7 +693,7 @@ def transformar_recebimentos(
 # RECEBIMENTOS BI
 # ============================================================
 
-def upsert_recebimentos_bi(
+def upsert_slv_financeiro_recebimento(
     registros: list[dict],
 ) -> dict:
 
@@ -758,7 +758,7 @@ def upsert_recebimentos_bi(
             # =================================================
 
             sql = f"""
-                INSERT INTO recebimentos_bi (
+                INSERT INTO slv_financeiro_recebimento (
                     {', '.join(colunas)}
                 )
                 VALUES (
