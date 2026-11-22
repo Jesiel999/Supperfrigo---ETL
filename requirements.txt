@@ -10,3 +10,4 @@ pydantic>=2.7.0
 APScheduler>=3.10.4,<4.0
 SQLAlchemy>=2.0,<3.0
 ConcurrentLogHandler==0.9.1
+concurrent-log-handler>=0.9.28,<1.0
