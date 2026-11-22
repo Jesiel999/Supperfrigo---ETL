@@ -159,8 +159,8 @@ def iniciar_scheduler():
 
     # SANCES FINANCEIRO DIÁRIO -> 30/30 min, 07h–19h, seg a sáb
     trigger_diario = OrTrigger([
-        CronTrigger(day_of_week="mon-sat", hour="7-18", minute="15,45"),
-        CronTrigger(day_of_week="mon-sat", hour="19", minute="15"),
+        CronTrigger(hour="7-18", minute="15,45"),
+        CronTrigger(hour="19", minute="15"),
     ])
     scheduler.add_job(
         job_sances_financeiro_diario,
