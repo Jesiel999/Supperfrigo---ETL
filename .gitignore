@@ -5,3 +5,4 @@ text.py
 /monitoring
 __pycache__/
 /storage/termos/emitidos
+Dockerfile
