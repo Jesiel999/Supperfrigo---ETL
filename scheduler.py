@@ -110,52 +110,52 @@ def iniciar_scheduler():
     #   :15/:45 financeiro diário | :20/:50 financeiro total | :25 pessoa
 
     # SANCES PÓS-VENDA -> 30 em 30 minutos
-    scheduler.add_job(
-        job_sances_pos_venda,
-        CronTrigger(minute="0,30"),
-        max_instances=1,
-        misfire_grace_time=300,
-        next_run_time=_em(0),
-        coalesce=True,
-        replace_existing=True,
-        id="etl_sances_pos_venda",
-    )
+    #scheduler.add_job(
+    #    job_sances_pos_venda,
+    #    CronTrigger(minute="0,30"),
+    #    max_instances=1,
+    #    misfire_grace_time=300,
+    #    next_run_time=_em(0),
+    #    coalesce=True,
+    #    replace_existing=True,
+    #    id="etl_sances_pos_venda",
+    #)
 
     # SANCES ESTOQUE (peças) -> 30 em 30 minutos
-    scheduler.add_job(
-        job_sances_estoque,
-        CronTrigger(minute="5,35"),
-        max_instances=1,
-        misfire_grace_time=300,
-        # next_run_time=_em(60),
-        coalesce=True,
-        replace_existing=True,
-        id="etl_estoque_sances",
-    )
+    #scheduler.add_job(
+    #    job_sances_estoque,
+    #    CronTrigger(minute="5,35"),
+    #   max_instances=1,
+    #    misfire_grace_time=300,
+    #    # next_run_time=_em(60),
+    #    coalesce=True,
+    #    replace_existing=True,
+    #    id="etl_estoque_sances",
+    #)
 
     # ESTOQUE VEÍCULOS (incremental) -> 30 em 30 minutos
-    scheduler.add_job(
-        job_sances_estoque_veiculos,
-        CronTrigger(minute="10,40"),
-        max_instances=1,
-        misfire_grace_time=300,
+    # scheduler.add_job(
+    #    job_sances_estoque_veiculos,
+    #    CronTrigger(minute="10,40"),
+    #    max_instances=1,
+    #    misfire_grace_time=300,
         # next_run_time=_em(120),
-        coalesce=True,
-        replace_existing=True,
-        id="etl_estoque_veiculos_sances",
-    )
+    #    coalesce=True,
+    #    replace_existing=True,
+    #    id="etl_estoque_veiculos_sances",
+    #)
 
     # ESTOQUE VEÍCULOS (completo) -> 1x por dia às 03:15
-    scheduler.add_job(
-        job_sances_estoque_veiculos_completo,
-        CronTrigger(hour="3", minute="15"),
-        max_instances=1,
-        misfire_grace_time=1800,
-        # next_run_time=_em(0),   # descomente só na carga inicial
-        coalesce=True,
-        replace_existing=True,
-        id="etl_estoque_veiculos_sances_completo",
-    )
+    # scheduler.add_job(
+    #    job_sances_estoque_veiculos_completo,
+    #    CronTrigger(hour="3", minute="15"),
+    #    max_instances=1,
+    #    misfire_grace_time=1800,
+    #    # next_run_time=_em(0),   # descomente só na carga inicial
+    #    coalesce=True,
+    #    replace_existing=True,
+    #    id="etl_estoque_veiculos_sances_completo",
+    #)
 
     # SANCES FINANCEIRO DIÁRIO -> 30/30 min, 07h–19h, seg a sáb
     trigger_diario = OrTrigger([
