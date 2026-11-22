@@ -18,7 +18,7 @@ def connection_mysql():
             password=DB_PASSWORD,
             database=DB_NAME,
             charset="utf8mb4",
-            collation="utf8mb4_0900_ai_ci",
+            collation="utf8mb4_unicode_ci",
             autocommit=False,
             connection_timeout=30
         )
