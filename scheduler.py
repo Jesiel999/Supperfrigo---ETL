@@ -167,6 +167,7 @@ def iniciar_scheduler():
         trigger_diario,
         max_instances=1,
         misfire_grace_time=300,
+        next_run_time=_em(0),
         coalesce=True,
         replace_existing=True,
         id="etl_financeiro_diario",
