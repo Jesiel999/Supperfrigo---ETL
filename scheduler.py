@@ -178,7 +178,7 @@ def iniciar_scheduler():
         CronTrigger(hour="19-23,0-6", minute="20,50"),
         max_instances=1,
         misfire_grace_time=300,
-        # next_run_time=_em(180),
+        next_run_time=_em(180),
         coalesce=True,
         replace_existing=True,
         id="etl_financeiro_total",
