@@ -132,7 +132,7 @@ def _remover_recebimentos_titulo(conn, codigo_titulo) -> None:
             (codigo_titulo,),
         )
         cursor_del.execute(
-            "DELETE FROM slv_financeiro_recebimento WHERE codigo_origem = %s",
+            "DELETE FROM slv_financeiro_recebimento WHERE codigo_raw = %s",
             (codigo_titulo,),
         )
     finally:
@@ -179,7 +179,7 @@ def upsert_brz_sances_financeiro_titulo(registros: list[dict]) -> dict:
                     data_insercao,
                     codigo_situacao
                 FROM brz_sances_financeiro_titulo
-                WHERE codigo = %s
+                WHERE codigo_origem = %s
                 """,
                 (codigo,),
             )
@@ -197,9 +197,9 @@ def upsert_brz_sances_financeiro_titulo(registros: list[dict]) -> dict:
                 )
                 or
                 data_mais_recente(
-                                    item.get("data_vencimento"),
-                                    existente.get("data_vencimento") if existente else None
-                                )
+                    item.get("data_vencimento"),
+                    existente.get("data_vencimento") if existente else None
+                )
                 or
                 data_mais_recente(
                     item.get("data_competencia"),
@@ -581,13 +581,13 @@ def buscar_brz_sances_financeiro_recebimento_para_transform(
             WHERE rr.tenant_id = %s
 
               AND (
-                    rb.codigo_origem IS NULL
+                    rb.codigo_raw IS NULL
 
                     OR rr.data_alteracao > rb.atualizado_em
 
                     OR (
                         rr.data_alteracao IS NULL
-                        AND rb.codigo_origem IS NULL
+                        AND rb.codigo_raw IS NULL
                     )
               )
 
@@ -630,7 +630,7 @@ def transformar_recebimentos(
             "codigo_recebimento_raw": 
                 item.get("codigo_recebimento"),
 
-            "codigo_origem": 
+            "codigo_raw": 
                 codigo,
 
             "codigo_tipo_movimentacao":
@@ -720,17 +720,17 @@ def upsert_slv_financeiro_recebimento(
 
             tenant_id = item.get("tenant_id")
             codigo = item.get("codigo_recebimento_raw")
-            codigo_origem = item.get("codigo_origem")
+            codigo_raw = item.get("codigo_raw")
             
             # =================================================
             # VALIDAÇÃO
             # =================================================
 
-            if tenant_id is None or codigo is None or codigo_origem is None:
+            if tenant_id is None or codigo is None or codigo_raw is None:
                 ignorados += 1
                 continue
 
-            if codigo_origem is None:
+            if codigo_raw is None:
 
                 ignorados += 1
 
@@ -750,7 +750,7 @@ def upsert_slv_financeiro_recebimento(
             updates = [
                 f"{coluna}=VALUES({coluna})"
                 for coluna in colunas
-                if coluna not in ("tenant_id", "codigo", "codigo_origem")
+                if coluna not in ("tenant_id", "codigo", "codigo_raw")
             ]
 
             # =================================================
