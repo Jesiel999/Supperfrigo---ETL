@@ -26,7 +26,7 @@ def buscar_datas_movimentacao_por_titulo(tenant_id: int) -> dict:
             SELECT
                 codigo,
                 MAX(data_movimentacao) AS data_movimentacao
-            FROM recebimentos_raw
+            FROM brz_sances_financeiro_recebimento
             WHERE tenant_id = %s
             GROUP BY codigo
             """,
@@ -106,7 +106,7 @@ def salvar_pagina_raw(
     for item in recebimentos:
         item["tenant_id"] = tenant_id
 
-    resultado_titulos = upsert_financeiro_raw(itens)
+    resultado_titulos = upsert_brz_sances_financeiro_titulo(itens)
 
     resultado_recebimentos = upsert_financeiro_recebimento_raw(
         recebimentos
@@ -123,12 +123,12 @@ def salvar_pagina_raw(
 SITUACOES_COM_RECEBIMENTO = {"BAIXADO", "BAIXADO PARCIAL"}
 
 def _remover_recebimentos_titulo(conn, codigo_titulo) -> None:
-    """Remove recebimentos_raw e recebimentos_bi vinculados a um título
+    """Remove brz_sances_financeiro_recebimento e recebimentos_bi vinculados a um título
     que deixou de estar baixado/baixado parcial."""
     cursor_del = conn.cursor()
     try:
         cursor_del.execute(
-            "DELETE FROM recebimentos_raw WHERE codigo = %s",
+            "DELETE FROM brz_sances_financeiro_recebimento WHERE codigo = %s",
             (codigo_titulo,),
         )
         cursor_del.execute(
@@ -142,7 +142,7 @@ def _remover_recebimentos_titulo(conn, codigo_titulo) -> None:
 # FINANCEIRO RAW
 # ============================================================
 
-def upsert_financeiro_raw(registros: list[dict]) -> dict:
+def upsert_brz_sances_financeiro_titulo(registros: list[dict]) -> dict:
 
     if not registros:
         return {
@@ -178,7 +178,7 @@ def upsert_financeiro_raw(registros: list[dict]) -> dict:
                     data_baixa,
                     data_insercao,
                     codigo_situacao
-                FROM financeiro_raw
+                FROM brz_sances_financeiro_titulo
                 WHERE codigo = %s
                 """,
                 (codigo,),
@@ -226,7 +226,7 @@ def upsert_financeiro_raw(registros: list[dict]) -> dict:
             updates      = [f"{c}=VALUES({c})" for c in colunas if c != "codigo"]
 
             sql = f"""
-                INSERT INTO financeiro_raw ({', '.join(colunas)})
+                INSERT INTO brz_sances_financeiro_titulo ({', '.join(colunas)})
                 VALUES ({', '.join(placeholders)})
                 ON DUPLICATE KEY UPDATE {', '.join(updates)}
             """
@@ -327,7 +327,7 @@ def upsert_financeiro_recebimento_raw(registros: list[dict]) -> dict:
             ]
 
             sql = f"""
-                INSERT INTO recebimentos_raw ({', '.join(colunas)})
+                INSERT INTO brz_sances_financeiro_recebimento ({', '.join(colunas)})
                 VALUES ({', '.join(placeholders)})
                 ON DUPLICATE KEY UPDATE {', '.join(updates)}
             """
@@ -392,7 +392,7 @@ def buscar_raw_para_transform(
 
             sql = """
                 SELECT fr.*
-                FROM financeiro_raw fr
+                FROM brz_sances_financeiro_titulo fr
                 LEFT JOIN financeiro_bi fb
                     ON fb.codigo_raw = fr.codigo
                 WHERE fb.codigo_raw IS NULL
@@ -401,7 +401,7 @@ def buscar_raw_para_transform(
 
             sql = """
                 SELECT fr.*
-                FROM financeiro_raw fr
+                FROM brz_sances_financeiro_titulo fr
                 LEFT JOIN financeiro_bi fb
                     ON fb.codigo_raw = fr.codigo
                 WHERE fb.codigo_raw IS NULL
@@ -421,7 +421,7 @@ def buscar_raw_para_transform(
 
             sql = """
                 SELECT *
-                FROM financeiro_raw
+                FROM brz_sances_financeiro_titulo
                 ORDER BY codigo ASC
             """
 
@@ -561,7 +561,7 @@ def upsert_financeiro_bi(
 # BUSCAR RECEBIMENTOS RAW
 # ============================================================
 
-def buscar_recebimentos_raw_para_transform(
+def buscar_brz_sances_financeiro_recebimento_para_transform(
     tenant_id: int,
 ) -> list[dict]:
 
@@ -573,7 +573,7 @@ def buscar_recebimentos_raw_para_transform(
         cursor.execute(
             """
             SELECT rr.*
-            FROM recebimentos_raw rr
+            FROM brz_sances_financeiro_recebimento rr
             LEFT JOIN recebimentos_bi rb
                 ON rb.tenant_id = rr.tenant_id
                AND rb.codigo_recebimento_raw = rr.codigo_recebimento

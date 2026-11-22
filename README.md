@@ -14,7 +14,7 @@ ETL/
 ├── database/
 │   ├── mysql_connection.py
 │   └── schemas/
-│       ├── bronze/financeiro_raw.sql
+│       ├── bronze/brz_sances_financeiro_titulo.sql
 │       └── silver/financeiro_bi.sql
 ├── bronze/extract/sances/financeiro.py
 ├── silver/transform/financeiro/financeiro.py
@@ -127,7 +127,7 @@ API Sances
       │
       ▼
 BRONZE
-financeiro_raw
+brz_sances_financeiro_titulo
       │
       │ Extração dos dados
       ▼

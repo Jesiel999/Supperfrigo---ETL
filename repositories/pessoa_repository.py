@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 # ── Bronze: RAW ──────────────────────────────────────────────
 
-def upsert_pessoa_sances_raw(registros: list[dict]) -> dict:
+def upsert_brz_sances_pessoa(registros: list[dict]) -> dict:
     """Insere/atualiza pessoas extraídas do Sances. PK natural: codigo_cliente."""
     if not registros:
         return {"processados": 0}
@@ -15,7 +15,7 @@ def upsert_pessoa_sances_raw(registros: list[dict]) -> dict:
     cursor = conn.cursor()
 
     sql = """
-        INSERT INTO pessoa_sances_raw
+        INSERT INTO brz_sances_pessoa
             (codigo_cliente, tipo, cpf_cnpj, nome_cliente, sexo)
         VALUES (%s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
@@ -36,11 +36,11 @@ def upsert_pessoa_sances_raw(registros: list[dict]) -> dict:
     cursor.close()
     conn.close()
 
-    # logger.info(f"[pessoa_sances_raw] {len(registros)} registros processados.")
+    # logger.info(f"[brz_sances_pessoa] {len(registros)} registros processados.")
     return {"processados": len(registros), "afetados": afetados}
 
 
-def upsert_pessoa_sults_raw(registros: list[dict]) -> dict:
+def upsert_brz_sults_pessoa(registros: list[dict]) -> dict:
     """Insere/atualiza pessoas extraídas do Sults. PK natural: id."""
     if not registros:
         return {"processados": 0}
@@ -49,7 +49,7 @@ def upsert_pessoa_sults_raw(registros: list[dict]) -> dict:
     cursor = conn.cursor()
 
     sql = """
-        INSERT INTO pessoa_sults_raw
+        INSERT INTO brz_sults_pessoa
             (id, nome, ativo, sexo, cpf, celular, telefone, email,
              dtCadastro, dtUltimaAlteracao, dtInativacao)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -81,11 +81,11 @@ def upsert_pessoa_sults_raw(registros: list[dict]) -> dict:
     cursor.close()
     conn.close()
 
-    # logger.info(f"[pessoa_sults_raw] {len(registros)} registros processados.")
+    # logger.info(f"[brz_sults_pessoa] {len(registros)} registros processados.")
     return {"processados": len(registros), "afetados": afetados}
 
 
-def upsert_endereco_sances_raw(pessoa_id: int, endereco: dict | None) -> None:
+def upsert_brz_sances_pessoa_endereco(pessoa_id: int, endereco: dict | None) -> None:
     """Grava o endereço aninhado no registro de pessoa. 1 endereço por pessoa."""
     if not pessoa_id or not endereco:
         return
@@ -94,7 +94,7 @@ def upsert_endereco_sances_raw(pessoa_id: int, endereco: dict | None) -> None:
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO endereco_sances_raw
+        INSERT INTO brz_sances_pessoa_endereco
             (pessoa_id, rua, numero, complemento, bairro, cidade, uf, cep)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
@@ -111,7 +111,7 @@ def upsert_endereco_sances_raw(pessoa_id: int, endereco: dict | None) -> None:
     conn.close()
 
 
-def upsert_telefone_sances_raw(pessoa_id: int, telefone: dict | None) -> None:
+def upsert_brz_sances_pessoa_telefone(pessoa_id: int, telefone: dict | None) -> None:
     """Grava o telefone aninhado no registro de pessoa. 1 linha por pessoa (celular/comercial/residencial em colunas)."""
     if not pessoa_id or not telefone:
         return
@@ -120,7 +120,7 @@ def upsert_telefone_sances_raw(pessoa_id: int, telefone: dict | None) -> None:
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO telefone_sances_raw (pessoa_id, celular, comercial, residencial)
+        INSERT INTO brz_sances_pessoa_telefone (pessoa_id, celular, comercial, residencial)
         VALUES (%s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             celular = VALUES(celular), comercial = VALUES(comercial), residencial = VALUES(residencial)
@@ -132,7 +132,7 @@ def upsert_telefone_sances_raw(pessoa_id: int, telefone: dict | None) -> None:
     conn.close()
 
 
-def upsert_email_sances_raw(pessoa_id: int, email: dict | None) -> None:
+def upsert_brz_sances_pessoa_email(pessoa_id: int, email: dict | None) -> None:
     """
     Grava os e-mails aninhados no registro de pessoa. O bloco "email" vem
     como {"principal": "...", "financeiro": "..."} — uma linha por tipo
@@ -149,7 +149,7 @@ def upsert_email_sances_raw(pessoa_id: int, email: dict | None) -> None:
     cursor = conn.cursor()
     cursor.executemany(
         """
-        INSERT INTO email_sances_raw (pessoa_id, email, tipo)
+        INSERT INTO brz_sances_pessoa_email (pessoa_id, email, tipo)
         VALUES (%s, %s, %s)
         ON DUPLICATE KEY UPDATE email = VALUES(email)
         """,
@@ -164,11 +164,11 @@ def upsert_pessoa_sances_completo(registros: list[dict]) -> dict:
     """
     Recebe os registros crus da API Sances — já incluindo os blocos
     aninhados de endereco/email/telefone — e distribui os dados entre
-    as 4 tabelas raw: pessoa_sances_raw, endereco_sances_raw,
-    email_sances_raw, telefone_sances_raw.
+    as 4 tabelas raw: brz_sances_pessoa, brz_sances_pessoa_endereco,
+    brz_sances_pessoa_email, brz_sances_pessoa_telefone.
 
     É esta função que o Step de Bronze deve chamar (não
-    upsert_pessoa_sances_raw sozinha), pois é ela quem sabe separar o
+    upsert_brz_sances_pessoa sozinha), pois é ela quem sabe separar o
     payload único do endpoint nas tabelas certas.
     """
     if not registros:
@@ -184,13 +184,13 @@ def upsert_pessoa_sances_completo(registros: list[dict]) -> dict:
         }
         for r in registros
     ]
-    resultado_pessoa = upsert_pessoa_sances_raw(pessoas)
+    resultado_pessoa = upsert_brz_sances_pessoa(pessoas)
 
     for r in registros:
         pessoa_id = r.get("codigo_cliente")
-        upsert_endereco_sances_raw(pessoa_id, r.get("endereco"))
-        upsert_email_sances_raw(pessoa_id, r.get("email"))
-        upsert_telefone_sances_raw(pessoa_id, r.get("telefone"))
+        upsert_brz_sances_pessoa_endereco(pessoa_id, r.get("endereco"))
+        upsert_brz_sances_pessoa_email(pessoa_id, r.get("email"))
+        upsert_brz_sances_pessoa_telefone(pessoa_id, r.get("telefone"))
 
     # logger.info(
     #    f"[pessoa_sances_completo] {len(registros)} pessoas processadas "
@@ -202,8 +202,8 @@ def upsert_pessoa_sances_completo(registros: list[dict]) -> dict:
 def _primeiro_ou_lista(valores) -> str | None:
     """
     celular/telefone/email vêm como array na API do Sults, mas
-    pessoa_sults_raw só tem uma coluna VARCHAR para cada (não é lista
-    como email_sances_raw). Junta com "; " para não perder dado, mas
+    brz_sults_pessoa só tem uma coluna VARCHAR para cada (não é lista
+    como brz_sances_pessoa_email). Junta com "; " para não perder dado, mas
     se sua realidade tem pessoas com vários números/e-mails com
     frequência, vale considerar criar tabelas filhas como as da Sances.
     """
@@ -304,7 +304,7 @@ def upsert_pessoa_sults_completo(registros: list[dict]) -> dict:
     """
     Recebe os registros crus da API Sults — já incluindo os blocos
     aninhados de endereco/empresa/campoAdicional — e distribui os dados
-    entre pessoa_sults_raw, endereco_sults_raw, empresa_sults_raw e
+    entre brz_sults_pessoa, endereco_sults_raw, empresa_sults_raw e
     campoAdicional_sults_raw.
     """
     if not registros:
@@ -326,7 +326,7 @@ def upsert_pessoa_sults_completo(registros: list[dict]) -> dict:
         }
         for r in registros
     ]
-    resultado_pessoa = upsert_pessoa_sults_raw(pessoas)
+    resultado_pessoa = upsert_brz_sults_pessoa(pessoas)
 
     for r in registros:
         pessoa_id = r.get("id")
@@ -349,10 +349,10 @@ def buscar_raw_para_transform() -> dict:
     conn = connection_mysql()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("SELECT * FROM pessoa_sances_raw")
+    cursor.execute("SELECT * FROM brz_sances_pessoa")
     sances = cursor.fetchall()
 
-    cursor.execute("SELECT * FROM pessoa_sults_raw")
+    cursor.execute("SELECT * FROM brz_sults_pessoa")
     sults = cursor.fetchall()
 
     cursor.close()

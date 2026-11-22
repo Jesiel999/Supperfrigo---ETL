@@ -33,8 +33,8 @@ def extrair_pessoa_sances(
         if not filtrado.get("codigo_cliente"):
             return
         # upsert_pessoa_sances_completo já sabe distribuir entre
-        # pessoa_sances_raw + endereco_sances_raw + email_sances_raw +
-        # telefone_sances_raw — reaproveitado sem alteração.
+        # brz_sances_pessoa + brz_sances_pessoa_endereco + brz_sances_pessoa_email +
+        # brz_sances_pessoa_telefone — reaproveitado sem alteração.
         upsert_pessoa_sances_completo([filtrado])
 
     return extrair_por_codigo(
