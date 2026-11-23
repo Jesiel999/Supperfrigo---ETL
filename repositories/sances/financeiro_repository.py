@@ -4,7 +4,8 @@ from datetime import datetime
 from database.mysql_connection import connection_mysql
 from core.logger import get_layer_logger
 
-logger = get_layer_logger("bronze", "financeiro_repository")
+logger_bronze = get_layer_logger("bronze", "financeiro_repository")
+logger_silver = get_layer_logger("silver", "financeiro_repository")
 
 BATCH_COMMIT = 500
 
@@ -383,6 +384,12 @@ def buscar_raw_para_transform(
     somente_nao_transformados: bool = False,
 ) -> list[dict]:
 
+    logger_silver.info(
+        "[FINANCEIRO] Iniciando busca Bronze para Silver | "
+        "somente_nao_transformados=%s",
+        somente_nao_transformados,
+    )
+
     conn = connection_mysql()
     cursor = conn.cursor(dictionary=True)
 
@@ -426,11 +433,28 @@ def buscar_raw_para_transform(
             """
 
         cursor.execute(sql)
+        
+        registros = cursor.fetchall()
 
-        return cursor.fetchall()
+        logger_silver.info(
+            "[FINANCEIRO] Busca Bronze concluída | registros=%s",
+            len(registros),
+        )
+
+        if not registros:
+            logger_silver.warning(
+                "[FINANCEIRO] Nenhum registro encontrado para transformação"
+            )
+
+        return registros
+
+    except Exception:
+        logger_silver.exception(
+            "[FINANCEIRO] Erro ao buscar registros Bronze"
+        )
+        raise
 
     finally:
-
         cursor.close()
         conn.close()
 
@@ -438,13 +462,28 @@ def buscar_raw_para_transform(
 # FINANCEIRO BI
 # ============================================================
 
+
 def upsert_slv_financeiro_titulo(
     registros: list[dict],
 ) -> dict:
 
     if not registros:
+        logger_silver.warning(
+            "[FINANCEIRO] Silver não executado: nenhum título recebido"
+        )
+        return {
+            "inseridos": 0,
+            "atualizados": 0,
+            "ignorados": 0,
+            "erros": 0,
+        }
 
-        return {"inseridos": 0, "atualizados": 0, "ignorados": 0, "erros": 0}
+    total = len(registros)
+
+    logger_silver.info(
+        "[FINANCEIRO] INICIANDO UPSERT SILVER TÍTULOS | total=%s",
+        total,
+    )
 
     conn = connection_mysql()
     cursor = conn.cursor(dictionary=True)
@@ -452,81 +491,58 @@ def upsert_slv_financeiro_titulo(
     inseridos = 0
     atualizados = 0
     ignorados = 0
-
-    erros       = 0
-    BATCH_COMMIT = 500
-
     erros = 0
 
     try:
-
         for i, item in enumerate(registros, start=1):
 
             codigo_origem = item.get("codigo_origem")
 
-            # ------------------------------------------------
-            # Validação
-            # ------------------------------------------------
-
             if not codigo_origem:
-
                 ignorados += 1
+                logger_silver.warning(
+                    "[FINANCEIRO] Registro ignorado: codigo_origem ausente"
+                )
                 continue
 
-            # ------------------------------------------------
-            # Busca existente
-            # ------------------------------------------------
-
-            cursor.execute(
-                """
-                SELECT
-                    codigo_origem,
-                    atualizado_em,
-                    data_baixa,
-                    codigo_situacao
-                FROM slv_financeiro_titulo
-                WHERE codigo_origem = %s
-                """,
-                (codigo_origem,),
-            )
-
-            existente = cursor.fetchone()
-
-            # =================================================
-            # UPSERT
-            # =================================================
-
-            colunas = list(item.keys())
-
-            placeholders = [
-                f"%({coluna})s"
-                for coluna in colunas
-            ]
-
-            updates = [
-                f"{coluna}=VALUES({coluna})"
-                for coluna in colunas
-                if coluna != "codigo_origem"
-            ]
-
-            sql = f"""
-                INSERT INTO slv_financeiro_titulo (
-                    {', '.join(colunas)}
-                )
-                VALUES (
-                    {', '.join(placeholders)}
-                )
-                ON DUPLICATE KEY UPDATE
-                    {', '.join(updates)}
-            """
-
             try:
+                cursor.execute(
+                    """
+                    SELECT codigo_origem
+                    FROM slv_financeiro_titulo
+                    WHERE codigo_origem = %s
+                    """,
+                    (codigo_origem,),
+                )
+
+                existente = cursor.fetchone()
+
+                colunas = list(item.keys())
+
+                placeholders = [
+                    f"%({coluna})s"
+                    for coluna in colunas
+                ]
+
+                updates = [
+                    f"{coluna}=VALUES({coluna})"
+                    for coluna in colunas
+                    if coluna != "codigo_origem"
+                ]
+
+                sql = f"""
+                    INSERT INTO slv_financeiro_titulo (
+                        {', '.join(colunas)}
+                    )
+                    VALUES (
+                        {', '.join(placeholders)}
+                    )
+                    ON DUPLICATE KEY UPDATE
+                        {', '.join(updates)}
+                """
 
                 if not conn.is_connected():
-                    conn.reconnect(
-                        attempts=3,
-                        delay=5,
-                    )
+                    conn.reconnect(attempts=3, delay=5)
 
                 cursor.execute(sql, item)
 
@@ -535,27 +551,61 @@ def upsert_slv_financeiro_titulo(
                 else:
                     inseridos += 1
 
-            except Exception as e:
-
+            except Exception:
                 conn.rollback()
-
                 erros += 1
 
-            # ------------------------------------------------
-            # Commit em lote
-            # ------------------------------------------------
+                logger_silver.exception(
+                    "[FINANCEIRO] Erro no UPSERT do título | "
+                    "codigo_origem=%s | registro=%s/%s",
+                    codigo_origem,
+                    i,
+                    total,
+                )
 
             if i % BATCH_COMMIT == 0:
                 conn.commit()
 
+                logger_silver.info(
+                    "[FINANCEIRO] Progresso Silver títulos | "
+                    "%s/%s | inseridos=%s | atualizados=%s | "
+                    "ignorados=%s | erros=%s",
+                    i,
+                    total,
+                    inseridos,
+                    atualizados,
+                    ignorados,
+                    erros,
+                )
+
         conn.commit()
 
-    finally:
+    except Exception:
+        conn.rollback()
+        logger_silver.exception(
+            "[FINANCEIRO] Falha geral no UPSERT Silver títulos"
+        )
+        raise
 
+    finally:
         cursor.close()
         conn.close()
 
-    return {"inseridos": inseridos, "atualizados": atualizados, "ignorados": ignorados, "erros": erros}
+    resultado = {
+        "inseridos": inseridos,
+        "atualizados": atualizados,
+        "ignorados": ignorados,
+        "erros": erros,
+    }
+
+    log_resultado(
+        "FINANCEIRO SILVER TÍTULOS",
+        resultado,
+        logger_silver,
+    )
+
+    return resultado
+
 
 # ============================================================
 # BUSCAR RECEBIMENTOS RAW
@@ -609,11 +659,17 @@ def buscar_brz_sances_financeiro_recebimento_para_transform(
 # TRANSFORMAR RECEBIMENTOS BI
 # ============================================================
 
-
 def transformar_recebimentos(
     registros: list[dict],
     tenant_id: int,
 ) -> list[dict]:
+
+    logger_silver.info(
+        "[FINANCEIRO] Iniciando transformação de recebimentos | "
+        "tenant_id=%s | registros_entrada=%s",
+        tenant_id,
+        len(registros),
+    )
 
     resultado = []
 
@@ -626,69 +682,39 @@ def transformar_recebimentos(
 
         registro = {
             "tenant_id": tenant_id,
-
-            "codigo_recebimento_raw": 
-                item.get("codigo_recebimento"),
-
-            "codigo_raw": 
-                codigo,
-
-            "codigo_tipo_movimentacao":
-                item.get("codigo_tipo_movimentacao"),
-
-            "descricao_tipo_movimentacao":
-                item.get("descricao_tipo_movimentacao"),
-
-            "valor_pago":
-                item.get("valor_pago"),
-
-            "valor_nominal":
-                item.get("valor_nominal"),
-
-            "data_movimentacao":
-                item.get("data_movimentacao"),
-
-            "codigo_conta":
-                item.get("codigo_conta"),
-
-            "descricao_conta":
-                item.get("descricao_conta"),
-
-            "historico":
-                item.get("historico"),
-
-            "data_conciliacao":
-                item.get("data_conciliacao"),
-
-            "codigo_caixa":
-                item.get("codigo_caixa"),
-
-            "codigo_cheque_terceiro":
-                item.get("codigo_cheque_terceiro"),
-
-            "codigo_pagamento_cartao":
-                item.get("codigo_pagamento_cartao"),
-
-            "desconto":
-                item.get("desconto"),
-
-            "acrescimo":
-                item.get("acrescimo"),
-
-            "juros":
-                item.get("juros"),
-
-            "multa":
-                item.get("multa"),
-
-            "data_alteracao":
-                item.get("data_alteracao"),
+            "codigo_recebimento_raw": item.get("codigo_recebimento"),
+            "codigo_raw": codigo,
+            "codigo_tipo_movimentacao": item.get("codigo_tipo_movimentacao"),
+            "descricao_tipo_movimentacao": item.get("descricao_tipo_movimentacao"),
+            "valor_pago": item.get("valor_pago"),
+            "valor_nominal": item.get("valor_nominal"),
+            "data_movimentacao": item.get("data_movimentacao"),
+            "codigo_conta": item.get("codigo_conta"),
+            "descricao_conta": item.get("descricao_conta"),
+            "historico": item.get("historico"),
+            "data_conciliacao": item.get("data_conciliacao"),
+            "codigo_caixa": item.get("codigo_caixa"),
+            "codigo_cheque_terceiro": item.get("codigo_cheque_terceiro"),
+            "codigo_pagamento_cartao": item.get("codigo_pagamento_cartao"),
+            "desconto": item.get("desconto"),
+            "acrescimo": item.get("acrescimo"),
+            "juros": item.get("juros"),
+            "multa": item.get("multa"),
+            "data_alteracao": item.get("data_alteracao"),
         }
 
         resultado.append(registro)
 
-    return resultado
+    logger_silver.info(
+        "[FINANCEIRO] Transformação de recebimentos concluída | "
+        "tenant_id=%s | entrada=%s | saída=%s",
+        tenant_id,
+        len(registros),
+        len(resultado),
+    )
 
+    return resultado
+    
 # ============================================================
 # RECEBIMENTOS BI
 # ============================================================
