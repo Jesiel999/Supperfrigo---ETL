@@ -71,8 +71,8 @@ def transformar_financeiro(
             bi = {
                 "tenant_id":                   tenant_id,
                 "codigo_origem":                  codigo,
-                "id_empresa":                  raw.get("codigo_empresa"),
-                "id_pessoa":                   raw.get("codigo_pessoa"),
+                "empresa_id":                  raw.get("codigo_empresa"),
+                "pessoa_id":                   raw.get("codigo_pessoa"),
                 "tipo_titulo":                 raw.get("tipo_titulo"),
                 "numero_documento":            raw.get("numero_documento"),
                 "ordem":                       raw.get("ordem"),
