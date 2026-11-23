@@ -8,7 +8,7 @@ class Chip(Base):
     __tablename__ = "chips"
 
     id = Column(Integer, primary_key=True, index=True)
-    id_empresa = Column(Integer, ForeignKey("empresa_bi.codigo_empresa"), nullable=False)
+    id_empresa = Column(Integer, ForeignKey("slv_empresa.codigo_empresa"), nullable=False)
     id_departamento = Column(Integer, ForeignKey("dim_departamento.id"), nullable=True)
     id_colaborador = Column(Integer, ForeignKey("pessoa_bi.id"), nullable=True)
     numero = Column(String(50))

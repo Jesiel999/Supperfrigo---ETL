@@ -6,7 +6,7 @@ logger = get_layer_logger("silver", "empresa_transform")
 
 def transformar_empresa(registros_raw: list[dict]) -> list[dict]:
     """
-    Retorna dimensão empresa_bi (única).
+    Retorna dimensão slv_empresa (única).
     """
 
     empresas_map: dict[int, dict] = {}

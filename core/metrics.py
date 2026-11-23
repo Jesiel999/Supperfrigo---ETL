@@ -1,13 +1,27 @@
+
 import logging
 import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class Metrics:
-    """Rastreia métricas de execução do pipeline."""
+    """Centraliza métricas de execução do pipeline ETL."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        pipeline: str | None = None,
+        camada: str | None = None,
+    ):
+        self.pipeline = pipeline
+        self.camada = camada
+
+        self.reset()
+
+    def reset(self):
+        """Reinicia as métricas da execução."""
+
         self._start: float | None = None
         self._end: float | None = None
 
@@ -18,18 +32,19 @@ class Metrics:
         self.total_erros = 0
 
     def start(self):
-        self._start = time.time()
+        self._start = time.perf_counter()
         self._end = None
 
     def stop(self):
-        self._end = time.time()
+        if self._start is not None:
+            self._end = time.perf_counter()
 
     @property
     def elapsed(self) -> float:
         if self._start is None:
             return 0.0
 
-        end = self._end or time.time()
+        end = self._end or time.perf_counter()
 
         return round(end - self._start, 2)
 
@@ -51,9 +66,7 @@ class Metrics:
         ignorados: int = 0,
         erros: int = 0,
     ):
-        """
-        Adiciona métricas de um step à execução.
-        """
+        """Acumula métricas de uma etapa."""
 
         self.total_processados += processados
         self.total_inseridos += inseridos
@@ -61,42 +74,47 @@ class Metrics:
         self.total_ignorados += ignorados
         self.total_erros += erros
 
-    def adicionar_resultado(self, resultado: dict | None):
-        """
-        Extrai métricas de um resultado de step.
+    @staticmethod
+    def _obter(
+        resultado: dict,
+        chave: str,
+        chave_alternativa: str,
+    ) -> int:
+        valor = resultado.get(
+            chave,
+            resultado.get(chave_alternativa, 0),
+        )
 
-        Aceita diferentes nomes para facilitar integração
-        com os resultados existentes.
-        """
+        return int(valor or 0)
+
+    def adicionar_resultado(self, resultado: dict | None):
+        """Extrai métricas de um resultado de etapa."""
 
         if not resultado:
             return
 
         self.adicionar(
-            processados=resultado.get(
-                "total_processados",
-                resultado.get("processados", 0),
+            processados=self._obter(
+                resultado, "total_processados", "processados"
             ),
-            inseridos=resultado.get(
-                "total_inseridos",
-                resultado.get("inseridos", 0),
+            inseridos=self._obter(
+                resultado, "total_inseridos", "inseridos"
             ),
-            atualizados=resultado.get(
-                "total_atualizados",
-                resultado.get("atualizados", 0),
+            atualizados=self._obter(
+                resultado, "total_atualizados", "atualizados"
             ),
-            ignorados=resultado.get(
-                "total_ignorados",
-                resultado.get("ignorados", 0),
+            ignorados=self._obter(
+                resultado, "total_ignorados", "ignorados"
             ),
-            erros=resultado.get(
-                "total_erros",
-                resultado.get("erros", 0),
+            erros=self._obter(
+                resultado, "total_erros", "erros"
             ),
         )
 
     def summary(self) -> dict:
         return {
+            "pipeline": self.pipeline,
+            "camada": self.camada,
             "tempo_total_segundos": self.elapsed,
             "velocidade_reg_por_segundo": self.velocidade,
             "total_processados": self.total_processados,
@@ -106,13 +124,59 @@ class Metrics:
             "total_erros": self.total_erros,
         }
 
-    def log_summary(self):
-        summary = self.summary()
+    def log_summary(self, logger_execucao=None):
+        """Registra o resumo consolidado."""
 
-        #logger.info("=" * 50)
-        #logger.info("MÉTRICAS DO PIPELINE")
+        log = logger_execucao or logger
+        resumo = self.summary()
 
-        for key, value in summary.items():
-            logger.info(f"  {key}: {value}")
+        log.info("=" * 60)
+        log.info(
+            "[ETL] RESUMO DA EXECUÇÃO | pipeline=%s | camada=%s",
+            self.pipeline,
+            self.camada,
+        )
 
-        #logger.info("=" * 50)
+        for chave, valor in resumo.items():
+            if chave not in ("pipeline", "camada"):
+                log.info("%s: %s", chave, valor)
+
+        log.info("=" * 60)
+
+
+def log_resultado(
+    nome: str,
+    resultado: dict | None,
+    logger_execucao: logging.Logger | None = None,
+):
+    """Registra o resultado individual de uma etapa."""
+
+    log = logger_execucao or logger
+
+    if not resultado:
+        log.warning(
+            "[ETL] Nenhum resultado recebido | etapa=%s",
+            nome,
+        )
+        return
+
+    log.info(
+        "[ETL] RESULTADO DA ETAPA | etapa=%s",
+        nome,
+    )
+
+    metricas = {
+        "processados": ("processados", "total_processados"),
+        "inseridos": ("inseridos", "total_inseridos"),
+        "atualizados": ("atualizados", "total_atualizados"),
+        "ignorados": ("ignorados", "total_ignorados"),
+        "erros": ("erros", "total_erros"),
+    }
+
+    for nome_metrica, chaves in metricas.items():
+        valor = resultado.get(
+            chaves[0],
+            resultado.get(chaves[1], 0),
+        )
+
+        log.info("  %s: %s", nome_metrica, valor)

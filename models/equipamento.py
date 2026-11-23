@@ -54,7 +54,7 @@ class ParqueTecnologico(Base):
     nome = Column(String(255), nullable=False)
     id_colaborador = Column(Integer, ForeignKey("pessoa_bi.id"), nullable=True)
     senha = Column(String(255))
-    id_empresa = Column(Integer, ForeignKey("empresa_bi.codigo_empresa"), nullable=False)
+    id_empresa = Column(Integer, ForeignKey("slv_empresa.codigo_empresa"), nullable=False)
     id_departamento = Column(Integer, ForeignKey("dim_departamento.id"), nullable=True)
     id_tipo = Column(Integer, ForeignKey("tipo_equipamento.id"), nullable=False)
     id_monitor = Column(Integer, ForeignKey("parque_tecnologico.id"), nullable=True)

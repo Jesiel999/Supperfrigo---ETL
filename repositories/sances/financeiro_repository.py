@@ -3,6 +3,7 @@ from datetime import datetime
 
 from database.mysql_connection import connection_mysql
 from core.logger import get_layer_logger
+from core.metrics import log_resultado
 
 logger_bronze = get_layer_logger("bronze", "financeiro_repository")
 logger_silver = get_layer_logger("silver", "financeiro_repository")
@@ -381,7 +382,7 @@ def upsert_financeiro_recebimento_raw(registros: list[dict]) -> dict:
 # ============================================================
 
 def buscar_raw_para_transform(
-    somente_nao_transformados: bool = False,
+    somente_nao_transformados: bool = True,
 ) -> list[dict]:
 
     logger_silver.info(
@@ -462,16 +463,17 @@ def buscar_raw_para_transform(
 # FINANCEIRO BI
 # ============================================================
 
-
 def upsert_slv_financeiro_titulo(
     registros: list[dict],
 ) -> dict:
 
     if not registros:
         logger_silver.warning(
-            "[FINANCEIRO] Silver não executado: nenhum título recebido"
+            "[FINANCEIRO] Silver títulos não executado: "
+            "nenhum registro recebido"
         )
         return {
+            "processados": 0,
             "inseridos": 0,
             "atualizados": 0,
             "ignorados": 0,
@@ -480,32 +482,49 @@ def upsert_slv_financeiro_titulo(
 
     total = len(registros)
 
+    inseridos = 0
+    atualizados = 0
+    ignorados = 0
+    erros = 0
+
+    tenant_ids = sorted({
+        item.get("tenant_id")
+        for item in registros
+        if item.get("tenant_id") is not None
+    })
+
     logger_silver.info(
-        "[FINANCEIRO] INICIANDO UPSERT SILVER TÍTULOS | total=%s",
+        "[FINANCEIRO] INICIANDO UPSERT SILVER TÍTULOS | "
+        "tenants=%s | total=%s",
+        tenant_ids,
         total,
     )
 
     conn = connection_mysql()
     cursor = conn.cursor(dictionary=True)
 
-    inseridos = 0
-    atualizados = 0
-    ignorados = 0
-    erros = 0
-
     try:
         for i, item in enumerate(registros, start=1):
 
             codigo_origem = item.get("codigo_origem")
+            pessoa_id = item.get("pessoa_id")
+            tenant_id = item.get("tenant_id")
 
             if not codigo_origem:
                 ignorados += 1
+
                 logger_silver.warning(
-                    "[FINANCEIRO] Registro ignorado: codigo_origem ausente"
+                    "[FINANCEIRO] Título ignorado | "
+                    "tenant_id=%s | codigo_origem ausente",
+                    tenant_id,
                 )
                 continue
 
             try:
+                if not conn.is_connected():
+                    conn.reconnect(attempts=3, delay=5)
+
+                # Verificar existência do título
                 cursor.execute(
                     """
                     SELECT codigo_origem
@@ -516,6 +535,37 @@ def upsert_slv_financeiro_titulo(
                 )
 
                 existente = cursor.fetchone()
+
+                # Validar relacionamento com pessoa
+                if pessoa_id is not None:
+
+                    cursor.execute(
+                        """
+                        SELECT 1
+                        FROM slv_pessoa
+                        WHERE codigo_sances = %s
+                        LIMIT 1
+                        """,
+                        (pessoa_id,),
+                    )
+
+                    pessoa_existe = cursor.fetchone()
+
+                    if not pessoa_existe:
+                        erros += 1
+
+                        logger_silver.error(
+                            "[FINANCEIRO] FK inválida: pessoa "
+                            "não encontrada na Silver | "
+                            "tenant_id=%s | codigo_origem=%s | "
+                            "pessoa_id=%s | registro=%s/%s",
+                            tenant_id,
+                            codigo_origem,
+                            pessoa_id,
+                            i,
+                            total,
+                        )
+                        continue
 
                 colunas = list(item.keys())
 
@@ -541,23 +591,39 @@ def upsert_slv_financeiro_titulo(
                         {', '.join(updates)}
                 """
 
-                if not conn.is_connected():
-                    conn.reconnect(attempts=3, delay=5)
+                # Isolar cada registro para evitar rollback
+                # de registros anteriores do mesmo lote.
+                cursor.execute("SAVEPOINT sp_financeiro_titulo")
 
-                cursor.execute(sql, item)
+                try:
+                    cursor.execute(sql, item)
 
-                if existente:
-                    atualizados += 1
-                else:
-                    inseridos += 1
+                    if existente:
+                        atualizados += 1
+                    else:
+                        inseridos += 1
+
+                    cursor.execute(
+                        "RELEASE SAVEPOINT sp_financeiro_titulo"
+                    )
+
+                except Exception:
+                    cursor.execute(
+                        "ROLLBACK TO SAVEPOINT sp_financeiro_titulo"
+                    )
+                    cursor.execute(
+                        "RELEASE SAVEPOINT sp_financeiro_titulo"
+                    )
+                    raise
 
             except Exception:
-                conn.rollback()
                 erros += 1
 
                 logger_silver.exception(
-                    "[FINANCEIRO] Erro no UPSERT do título | "
-                    "codigo_origem=%s | registro=%s/%s",
+                    "[FINANCEIRO] Erro no UPSERT Silver título | "
+                    "tenant_id=%s | codigo_origem=%s | "
+                    "registro=%s/%s",
+                    tenant_id,
                     codigo_origem,
                     i,
                     total,
@@ -567,9 +633,9 @@ def upsert_slv_financeiro_titulo(
                 conn.commit()
 
                 logger_silver.info(
-                    "[FINANCEIRO] Progresso Silver títulos | "
-                    "%s/%s | inseridos=%s | atualizados=%s | "
-                    "ignorados=%s | erros=%s",
+                    "[FINANCEIRO] PROGRESSO SILVER TÍTULOS | "
+                    "processados=%s/%s | inseridos=%s | "
+                    "atualizados=%s | ignorados=%s | erros=%s",
                     i,
                     total,
                     inseridos,
@@ -582,8 +648,9 @@ def upsert_slv_financeiro_titulo(
 
     except Exception:
         conn.rollback()
+
         logger_silver.exception(
-            "[FINANCEIRO] Falha geral no UPSERT Silver títulos"
+            "[FINANCEIRO] Falha geral no processamento Silver"
         )
         raise
 
@@ -592,11 +659,23 @@ def upsert_slv_financeiro_titulo(
         conn.close()
 
     resultado = {
+        "processados": total,
         "inseridos": inseridos,
         "atualizados": atualizados,
         "ignorados": ignorados,
         "erros": erros,
     }
+
+    logger_silver.info(
+        "[FINANCEIRO] FINALIZADO UPSERT SILVER TÍTULOS | "
+        "processados=%s | inseridos=%s | atualizados=%s | "
+        "ignorados=%s | erros=%s",
+        total,
+        inseridos,
+        atualizados,
+        ignorados,
+        erros,
+    )
 
     log_resultado(
         "FINANCEIRO SILVER TÍTULOS",
@@ -605,7 +684,6 @@ def upsert_slv_financeiro_titulo(
     )
 
     return resultado
-
 
 # ============================================================
 # BUSCAR RECEBIMENTOS RAW
@@ -714,7 +792,7 @@ def transformar_recebimentos(
     )
 
     return resultado
-    
+
 # ============================================================
 # RECEBIMENTOS BI
 # ============================================================
@@ -724,47 +802,44 @@ def upsert_slv_financeiro_recebimento(
 ) -> dict:
 
     if not registros:
-
+        logger_silver.warning(
+            "[FINANCEIRO] Silver recebimentos não executado: "
+            "nenhum registro recebido"
+        )
         return {
+            "processados": 0,
             "inseridos": 0,
             "atualizados": 0,
             "ignorados": 0,
             "erros": 0,
         }
 
-    conn = connection_mysql()
-    cursor = conn.cursor()
+    total = len(registros)
 
     inseridos = 0
     atualizados = 0
     ignorados = 0
     erros = 0
 
-    try:
+    logger_silver.info(
+        "[FINANCEIRO] INICIANDO UPSERT SILVER RECEBIMENTOS | "
+        "total=%s",
+        total,
+    )
 
+    conn = connection_mysql()
+    cursor = conn.cursor()
+
+    try:
         for i, item in enumerate(registros, start=1):
 
             tenant_id = item.get("tenant_id")
             codigo = item.get("codigo_recebimento_raw")
             codigo_raw = item.get("codigo_raw")
-            
-            # =================================================
-            # VALIDAÇÃO
-            # =================================================
 
             if tenant_id is None or codigo is None or codigo_raw is None:
                 ignorados += 1
                 continue
-
-            if codigo_raw is None:
-
-                ignorados += 1
-
-                continue
-
-            # =================================================
-            # COLUNAS
-            # =================================================
 
             colunas = list(item.keys())
 
@@ -776,12 +851,12 @@ def upsert_slv_financeiro_recebimento(
             updates = [
                 f"{coluna}=VALUES({coluna})"
                 for coluna in colunas
-                if coluna not in ("tenant_id", "codigo", "codigo_raw")
+                if coluna not in (
+                    "tenant_id",
+                    "codigo",
+                    "codigo_raw",
+                )
             ]
-
-            # =================================================
-            # UPSERT
-            # =================================================
 
             sql = f"""
                 INSERT INTO slv_financeiro_recebimento (
@@ -795,60 +870,102 @@ def upsert_slv_financeiro_recebimento(
             """
 
             try:
-
                 if not conn.is_connected():
+                    conn.reconnect(attempts=3, delay=5)
 
-                    conn.reconnect(
-                        attempts=3,
-                        delay=5,
+                cursor.execute(
+                    "SAVEPOINT sp_financeiro_recebimento"
+                )
+
+                try:
+                    cursor.execute(sql, item)
+
+                    if cursor.rowcount == 1:
+                        inseridos += 1
+                    elif cursor.rowcount == 2:
+                        atualizados += 1
+                    else:
+                        ignorados += 1
+
+                    cursor.execute(
+                        "RELEASE SAVEPOINT sp_financeiro_recebimento"
                     )
 
-                cursor.execute(sql, item)
+                except Exception:
+                    cursor.execute(
+                        "ROLLBACK TO SAVEPOINT sp_financeiro_recebimento"
+                    )
+                    cursor.execute(
+                        "RELEASE SAVEPOINT sp_financeiro_recebimento"
+                    )
+                    raise
 
-                if cursor.rowcount == 1:
-
-                    inseridos += 1
-
-                elif cursor.rowcount == 2:
-
-                    atualizados += 1
-
-                elif cursor.rowcount == 0:
-
-                    ignorados += 1
-
-            except Exception as e:
-
-                conn.rollback()
-
+            except Exception:
                 erros += 1
 
-            # =================================================
-            # COMMIT
-            # =================================================
+                logger_silver.exception(
+                    "[FINANCEIRO] Erro UPSERT recebimento | "
+                    "tenant_id=%s | codigo_recebimento=%s | "
+                    "codigo_raw=%s | registro=%s/%s",
+                    tenant_id,
+                    codigo,
+                    codigo_raw,
+                    i,
+                    total,
+                )
 
             if i % BATCH_COMMIT == 0:
-
                 conn.commit()
+
+                logger_silver.info(
+                    "[FINANCEIRO] PROGRESSO SILVER RECEBIMENTOS | "
+                    "processados=%s/%s | inseridos=%s | "
+                    "atualizados=%s | ignorados=%s | erros=%s",
+                    i,
+                    total,
+                    inseridos,
+                    atualizados,
+                    ignorados,
+                    erros,
+                )
 
         conn.commit()
 
-    except Exception as e:
-
+    except Exception:
         conn.rollback()
 
+        logger_silver.exception(
+            "[FINANCEIRO] Falha geral no UPSERT recebimentos"
+        )
         raise
 
     finally:
-
         cursor.close()
-        conn.close()    
+        conn.close()
 
     resultado = {
+        "processados": total,
         "inseridos": inseridos,
         "atualizados": atualizados,
         "ignorados": ignorados,
         "erros": erros,
     }
+
+    logger_silver.info(
+        "[FINANCEIRO] FINALIZADO UPSERT SILVER RECEBIMENTOS | "
+        "processados=%s | inseridos=%s | atualizados=%s | "
+        "ignorados=%s | erros=%s",
+        total,
+        inseridos,
+        atualizados,
+        ignorados,
+        erros,
+    )
+
+    log_resultado(
+        "FINANCEIRO SILVER RECEBIMENTOS",
+        resultado,
+        logger_silver,
+    )
 
     return resultado

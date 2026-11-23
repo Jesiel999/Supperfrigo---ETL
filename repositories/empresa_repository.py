@@ -5,16 +5,16 @@ from core.logger import get_layer_logger
 logger = get_layer_logger("bronze", "pessoa_repository")
 
 # ==========================================
-# SILVER — empresa_bi
+# SILVER — slv_empresa
 # ==========================================
 
-def upsert_empresa_bi(registros: list[dict]) -> dict:
+def upsert_slv_empresa(registros: list[dict]) -> dict:
     """
-    Insere ou atualiza registros na tabela empresa_bi.
+    Insere ou atualiza registros na tabela slv_empresa.
     Usa codigo_empresa como chave única.
     """
     if not registros:
-        # logger.warning("upsert_empresa_bi chamado com lista vazia.")
+        # logger.warning("upsert_slv_empresa chamado com lista vazia.")
         return {"inseridos": 0, "atualizados": 0, "erros": 0}
 
     conn = connection_mysql()
@@ -33,7 +33,7 @@ def upsert_empresa_bi(registros: list[dict]) -> dict:
                 continue
 
             cursor.execute(
-                "SELECT codigo_empresa FROM empresa_bi WHERE codigo_empresa = %s",
+                "SELECT codigo_empresa FROM slv_empresa WHERE codigo_empresa = %s",
                 (codigo_empresa,),
             )
             existe = cursor.fetchone()
@@ -43,7 +43,7 @@ def upsert_empresa_bi(registros: list[dict]) -> dict:
             updates = [f"{c}=VALUES({c})" for c in colunas if c != "codigo_empresa"]
 
             sql = f"""
-                INSERT INTO empresa_bi ({', '.join(colunas)})
+                INSERT INTO slv_empresa ({', '.join(colunas)})
                 VALUES ({', '.join(placeholders)})
                 ON DUPLICATE KEY UPDATE {', '.join(updates)}
             """
@@ -62,7 +62,7 @@ def upsert_empresa_bi(registros: list[dict]) -> dict:
             except Exception as e:
                 conn.rollback()
                 erros += 1
-                logger.error(f"Erro upsert empresa_bi codigo={codigo_empresa}: {e}")
+                logger.error(f"Erro upsert slv_empresa codigo={codigo_empresa}: {e}")
 
             if i % BATCH_COMMIT == 0:
                 conn.commit()
@@ -73,7 +73,7 @@ def upsert_empresa_bi(registros: list[dict]) -> dict:
         cursor.close()
         conn.close()
 
-    # logger.info(f"empresa_bi | INSERT={inseridos} UPDATE={atualizados} ERRO={erros}")
+    # logger.info(f"slv_empresa | INSERT={inseridos} UPDATE={atualizados} ERRO={erros}")
 
     return {
         "inseridos": inseridos,

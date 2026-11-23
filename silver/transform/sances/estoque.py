@@ -96,7 +96,7 @@ def _upsert_empresa(tenant_id: int, codigo_produto: int, e: dict, agora: datetim
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO estoque_empresa_bi
+        INSERT INTO estoque_slv_empresa
             (tenant_id, codigo_produto, codigo_empresa, cnpj, nome_razao, nome_fantasia, apelido,
              qtd_estoque, qtd_aplicadas, qtd_reservada, qtd_transito, qtd_pedido, qtd_bo, data_processamento)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
