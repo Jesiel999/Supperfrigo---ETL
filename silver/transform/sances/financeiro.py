@@ -111,44 +111,74 @@ def transformar_financeiro(
 
     return resultado
 
-def transformar_recebimentos(registros_raw: list[dict], tenant_id: int) -> list[dict]:
 
-    resultado: list[dict] = []
+def transformar_recebimentos(
+    registros_raw: list[dict],
+    tenant_id: int,
+) -> list[dict]:
+
+    resultado = []
+    ignorados = 0
+    erros = 0
+
+    logger.info(
+        "[RECEBIMENTOS] Iniciando transformação | "
+        "tenant=%s | entrada=%s",
+        tenant_id,
+        len(registros_raw),
+    )
 
     for raw in registros_raw:
         try:
             codigo_recebimento = raw.get("codigo_recebimento")
-            codigo_origem = raw.get("codigo")  # código do título pai (raw)
+            codigo_origem = raw.get("codigo")
 
             if codigo_recebimento is None or codigo_origem is None:
-                logger.warning(f"Recebimento sem codigo_recebimento/codigo ignorado: {raw}")
+                ignorados += 1
                 continue
 
             bi = {
-                "tenant_id":                   tenant_id,
-                "codigo_recebimento_raw":      codigo_recebimento,
-                "codigo_origem":                  codigo_origem,
-                "codigo_tipo_movimentacao":    raw.get("codigo_tipo_movimentacao"),
+                "tenant_id": tenant_id,
+                "codigo_recebimento_raw": codigo_recebimento,
+                "codigo_raw": codigo_origem,
+                "codigo_tipo_movimentacao": raw.get("codigo_tipo_movimentacao"),
                 "descricao_tipo_movimentacao": raw.get("descricao_tipo_movimentacao"),
-                "valor_pago":                  raw.get("valor_pago"),
-                "valor_nominal":               raw.get("valor_nominal"),
-                "data_movimentacao":           _to_date(raw.get("data_movimentacao")),
-                "codigo_conta":                raw.get("codigo_conta"),
-                "descricao_conta":             raw.get("descricao_conta"),
-                "historico":                   raw.get("historico"),
-                "data_conciliacao":            raw.get("data_conciliacao"),
-                "codigo_caixa":                raw.get("codigo_caixa"),
-                "codigo_cheque_terceiro":      raw.get("codigo_cheque_terceiro"),
-                "codigo_pagamento_cartao":     raw.get("codigo_pagamento_cartao"),
-                "desconto":                    raw.get("desconto"),
-                "acrescimo":                   raw.get("acrescimo"),
-                "juros":                       raw.get("juros"),
-                "multa":                       raw.get("multa"),
-                "atualizado_em":               raw.get("data_alteracao"),   # ver ponto abaixo
+                "valor_pago": raw.get("valor_pago"),
+                "valor_nominal": raw.get("valor_nominal"),
+                "data_movimentacao": _to_date(raw.get("data_movimentacao")),
+                "codigo_conta": raw.get("codigo_conta"),
+                "descricao_conta": raw.get("descricao_conta"),
+                "historico": raw.get("historico"),
+                "data_conciliacao": raw.get("data_conciliacao"),
+                "codigo_caixa": raw.get("codigo_caixa"),
+                "codigo_cheque_terceiro": raw.get("codigo_cheque_terceiro"),
+                "codigo_pagamento_cartao": raw.get("codigo_pagamento_cartao"),
+                "desconto": raw.get("desconto"),
+                "acrescimo": raw.get("acrescimo"),
+                "juros": raw.get("juros"),
+                "multa": raw.get("multa"),
+                "atualizado_em": raw.get("data_alteracao"),
             }
+
             resultado.append(bi)
 
-        except Exception as e:
-            logger.error(f"Erro ao transformar recebimento codigo_recebimento={raw.get('codigo_recebimento')} tenant={tenant_id}: {e}")
+        except Exception:
+            erros += 1
+            logger.exception(
+                "[RECEBIMENTOS] Erro na transformação | "
+                "tenant=%s | codigo_recebimento=%s",
+                tenant_id,
+                raw.get("codigo_recebimento"),
+            )
+
+    logger.info(
+        "[RECEBIMENTOS] Transformação concluída | "
+        "tenant=%s | entrada=%s | saída=%s | ignorados=%s | erros=%s",
+        tenant_id,
+        len(registros_raw),
+        len(resultado),
+        ignorados,
+        erros,
+    )
 
     return resultado

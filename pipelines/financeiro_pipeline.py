@@ -55,27 +55,81 @@ class StepTransformarFinanceiro(Step):
     def __init__(self):
         super().__init__("TransformarFinanceiro")
 
+
     def execute(self, context: dict) -> dict:
         tenant_id = context["tenant_id"]
 
-        mapa_movimentacao = buscar_datas_movimentacao_por_titulo(tenant_id)
+        logger.info(
+            "[FINANCEIRO] Iniciando transformação | tenant=%s",
+            tenant_id,
+        )
 
+        # --------------------------------------------------
+        # 1. TÍTULOS
+        # --------------------------------------------------
+
+        mapa_movimentacao = buscar_datas_movimentacao_por_titulo(tenant_id)
         registros_raw = buscar_raw_para_transform()
+        logger.info(
+            "[FINANCEIRO] Títulos encontrados na Bronze | total=%s",
+            len(registros_raw),
+        )
+
         registros_bi = transformar_financeiro(
             registros_raw,
             tenant_id=tenant_id,
             mapa_movimentacao=mapa_movimentacao,
         )
+
         resultado = upsert_slv_financeiro_titulo(registros_bi)
+
         context["silver_financeiro_resultado"] = resultado
 
-        brz_sances_financeiro_recebimento = buscar_brz_sances_financeiro_recebimento_para_transform(tenant_id)
-        slv_financeiro_recebimento = transformar_recebimentos(brz_sances_financeiro_recebimento, tenant_id=tenant_id)
-        resultado_recebimentos = upsert_slv_financeiro_recebimento(slv_financeiro_recebimento)
+        logger.info(
+            "[FINANCEIRO] Títulos processados | resultado=%s",
+            resultado,
+        )
+
+        # --------------------------------------------------
+        # 2. RECEBIMENTOS
+        # --------------------------------------------------
+
+        logger.info(
+            "[RECEBIMENTOS] Iniciando processamento | tenant=%s",
+            tenant_id,
+        )
+
+        bronze_recebimentos = (
+            buscar_brz_sances_financeiro_recebimento_para_transform(
+                tenant_id
+            )
+        )
+
+        logger.info(
+            "[RECEBIMENTOS] Bronze carregada | total=%s",
+            len(bronze_recebimentos),
+        )
+
+        silver_recebimentos = transformar_recebimentos(
+            bronze_recebimentos,
+            tenant_id=tenant_id,
+        )
+
+        logger.info(
+            "[RECEBIMENTOS] Transformação finalizada | total=%s",
+            len(silver_recebimentos),
+        )
+        resultado_recebimentos = upsert_slv_financeiro_recebimento(
+            silver_recebimentos
+        )
         context["silver_recebimentos_resultado"] = resultado_recebimentos
+        logger.info(
+            "[RECEBIMENTOS] UPSERT finalizado | resultado=%s",
+            resultado_recebimentos,
+        )
 
         return context
-          
+
 # ── Interface pública ─────────────────────────────────────────
 
 def executar_pipeline_financeiro(

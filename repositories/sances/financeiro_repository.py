@@ -124,19 +124,33 @@ def salvar_pagina_raw(
 
 SITUACOES_COM_RECEBIMENTO = {"BAIXADO", "BAIXADO PARCIAL"}
 
-def _remover_recebimentos_titulo(conn, codigo_titulo) -> None:
-    """Remove brz_sances_financeiro_recebimento e slv_financeiro_recebimento vinculados a um título
-    que deixou de estar baixado/baixado parcial."""
+def _remover_recebimentos_titulo(
+    conn,
+    tenant_id,
+    codigo_titulo
+) -> None:
+
     cursor_del = conn.cursor()
+
     try:
         cursor_del.execute(
-            "DELETE FROM brz_sances_financeiro_recebimento WHERE codigo = %s",
-            (codigo_titulo,),
+            """
+            DELETE FROM brz_sances_financeiro_recebimento
+            WHERE tenant_id = %s
+              AND codigo = %s
+            """,
+            (tenant_id, codigo_titulo),
         )
+
         cursor_del.execute(
-            "DELETE FROM slv_financeiro_recebimento WHERE codigo_raw = %s",
-            (codigo_titulo,),
+            """
+            DELETE FROM slv_financeiro_recebimento
+            WHERE tenant_id = %s
+              AND codigo_raw = %s
+            """,
+            (tenant_id, codigo_titulo),
         )
+
     finally:
         cursor_del.close()
 
@@ -254,7 +268,7 @@ def upsert_brz_sances_financeiro_titulo(registros: list[dict]) -> dict:
 
                     if descricao_situacao not in SITUACOES_COM_RECEBIMENTO:
                         try:
-                            _remover_recebimentos_titulo(conn, codigo)
+                            _remover_recebimentos_titulo(conn, item.get("tenant_id"), codigo)
                         except Exception as e_del:
                             logger.error(
                                 "Erro ao remover recebimentos do título "
@@ -399,30 +413,75 @@ def buscar_raw_para_transform(
         if somente_nao_transformados:
 
             sql = """
-                SELECT fr.*
+                SELECT
+                    fr.*
                 FROM brz_sances_financeiro_titulo fr
-                LEFT JOIN slv_financeiro_titulo fb
-                    ON fb.codigo_origem = fr.codigo
-                WHERE fb.codigo_origem IS NULL
-                   OR data_mais_recente
-            """
 
-            sql = """
-                SELECT fr.*
-                FROM brz_sances_financeiro_titulo fr
                 LEFT JOIN slv_financeiro_titulo fb
-                    ON fb.codigo_origem = fr.codigo
-                WHERE fb.codigo_origem IS NULL
-                OR fb.atualizado_em IS NULL
-                OR fr.data_alteracao > fb.atualizado_em
-                OR NOT (fr.data_baixa <=> fb.data_baixa)
-                OR NOT (fr.data_vencimento <=> fb.data_vencimento)
-                OR NOT (fr.data_competencia <=> fb.data_competencia)
-                OR (
-                        fr.codigo_situacao IS NOT NULL
-                        AND NOT (fr.codigo_situacao <=> fb.codigo_situacao)
-                )
-                ORDER BY fr.codigo ASC;
+                    ON fb.tenant_id = fr.tenant_id
+                    AND fb.codigo_origem = fr.codigo
+
+                WHERE
+                    fb.codigo_origem IS NULL
+
+                    OR NOT (
+                        fr.data_alteracao
+                        <=> fb.atualizado_em
+                    )
+
+                    OR NOT (
+                        fr.data_baixa
+                        <=> fb.data_baixa
+                    )
+
+                    OR NOT (
+                        fr.data_cancelamento
+                        <=> fb.data_cancelamento
+                    )
+
+                    OR NOT (
+                        fr.data_vencimento
+                        <=> fb.data_vencimento
+                    )
+
+                    OR NOT (
+                        fr.data_competencia
+                        <=> fb.data_competencia
+                    )
+
+                    OR NOT (
+                        fr.data_emissao
+                        <=> fb.data_emissao
+                    )
+
+                    OR NOT (
+                        fr.codigo_situacao
+                        <=> fb.codigo_situacao
+                    )
+
+                    OR NOT (
+                        fr.valor_nominal
+                        <=> fb.valor_nominal
+                    )
+
+                    OR NOT (
+                        fr.valor_total
+                        <=> fb.valor_total
+                    )
+
+                    OR NOT (
+                        fr.valor_multa
+                        <=> fb.valor_multa
+                    )
+
+                    OR NOT (
+                        fr.acrescimo
+                        <=> fb.acrescimo
+                    )
+
+                ORDER BY
+                    fr.tenant_id ASC,
+                    fr.codigo ASC;
             """
 
         else:
@@ -430,11 +489,11 @@ def buscar_raw_para_transform(
             sql = """
                 SELECT *
                 FROM brz_sances_financeiro_titulo
-                ORDER BY codigo ASC
+                ORDER BY tenant_id ASC, codigo ASC;
             """
 
         cursor.execute(sql)
-        
+
         registros = cursor.fetchall()
 
         logger_silver.info(
@@ -697,39 +756,35 @@ def buscar_brz_sances_financeiro_recebimento_para_transform(
     cursor = conn.cursor(dictionary=True)
 
     try:
-
         cursor.execute(
             """
-            SELECT rr.*
-            FROM brz_sances_financeiro_recebimento rr
-            LEFT JOIN slv_financeiro_recebimento rb
-                ON rb.tenant_id = rr.tenant_id
-               AND rb.codigo_recebimento_raw = rr.codigo_recebimento
-
-            WHERE rr.tenant_id = %s
-
-              AND (
-                    rb.codigo_raw IS NULL
-
-                    OR rr.atualizado_em > rb.atualizado_em
-
-                    OR (
-                        rr.atualizado_em IS NULL
-                        AND rb.codigo_raw IS NULL
-                    )
-              )
-
-            ORDER BY rr.codigo_recebimento ASC
+            SELECT *
+            FROM brz_sances_financeiro_recebimento
+            WHERE tenant_id = %s
+            ORDER BY codigo_recebimento ASC
             """,
             (tenant_id,),
         )
 
         registros = cursor.fetchall()
 
+        logger_silver.info(
+            "[RECEBIMENTOS] Busca Bronze concluída | "
+            "tenant=%s | registros=%s",
+            tenant_id,
+            len(registros),
+        )
+
         return registros
 
-    finally:
+    except Exception:
+        logger_silver.exception(
+            "[RECEBIMENTOS] Erro ao buscar Bronze | tenant=%s",
+            tenant_id,
+        )
+        raise
 
+    finally:
         cursor.close()
         conn.close()
 
@@ -753,15 +808,25 @@ def transformar_recebimentos(
 
     for item in registros:
 
-        codigo = item.get("codigo")
+        codigo_recebimento = item.get("codigo_recebimento_raw")
 
-        if codigo is None:
+        codigo_origem = item.get("codigo")
+
+        if codigo_recebimento is None or codigo_origem is None:
+            ignorados += 1
+
+            logger_silver.warning(
+                "[FINANCEIRO] Recebimento ignorado por ausência de código | "
+                "codigo_recebimento=%s | codigo_titulo=%s",
+                codigo_recebimento,
+                codigo_origem,
+            )
             continue
-
+        
         registro = {
             "tenant_id": tenant_id,
             "codigo_recebimento_raw": item.get("codigo_recebimento"),
-            "codigo_raw": codigo,
+            "codigo_raw": codigo_origem,
             "codigo_tipo_movimentacao": item.get("codigo_tipo_movimentacao"),
             "descricao_tipo_movimentacao": item.get("descricao_tipo_movimentacao"),
             "valor_pago": item.get("valor_pago"),
@@ -780,6 +845,15 @@ def transformar_recebimentos(
             "multa": item.get("multa"),
             "data_alteracao": item.get("data_alteracao"),
         }
+
+        logger_silver.info(
+            "[FINANCEIRO] Transformação concluída | "
+            "tenant_id=%s | entrada=%s | saída=%s | ignorados=%s",
+            tenant_id,
+            len(registros),
+            len(resultado),
+            ignorados,
+        )
 
         resultado.append(registro)
 
@@ -853,8 +927,7 @@ def upsert_slv_financeiro_recebimento(
                 for coluna in colunas
                 if coluna not in (
                     "tenant_id",
-                    "codigo",
-                    "codigo_raw",
+                    "codigo_recebimento_raw",
                 )
             ]
 
